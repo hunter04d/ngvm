@@ -1,0 +1,9 @@
+[package]
+name = "ngvm"
+version = "0.1.0"
+authors = ["hunter04d <hunter04d@gmail.com>"]
+edition = "2018"
+
+default-run = "main"
+
+[dependencies]
