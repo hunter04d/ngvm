@@ -154,8 +154,9 @@ fn get_layout<T>(n: usize) -> Result<Layout, LayoutErr> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::mem::size_of;
+
+    use super::*;
 
     /// Array should fit into one stack value
     #[test]

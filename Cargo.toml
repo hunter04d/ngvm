@@ -7,3 +7,7 @@ edition = "2018"
 default-run = "main"
 
 [dependencies]
+num_enum = "0.4"
+
+[dev-dependencies]
+pretty_assertions = "0.6"
