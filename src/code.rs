@@ -1,10 +1,10 @@
 use std::convert::TryInto;
 use std::mem::size_of;
 
-use crate::model;
-use crate::Vm;
 use crate::decoder::HANDLERS as D_HANDLERS;
 use crate::interpreter::HANDLERS as I_HANDLERS;
+use crate::model;
+use crate::Vm;
 /// Byte-code of this machine
 pub struct Code(Vec<u8>);
 
@@ -17,6 +17,7 @@ pub(crate) struct Chunk<'a> {
 }
 
 impl<'a> Chunk<'a> {
+    #[allow(dead_code)]
     pub(crate) fn get_bytes(&self) -> &[u8] {
         &self.bytes[self.offset..]
     }
@@ -28,6 +29,7 @@ impl<'a> Chunk<'a> {
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn advance(&mut self, by: usize) {
         self.offset += by;
     }

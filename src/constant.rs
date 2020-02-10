@@ -2,7 +2,7 @@ use std::mem::size_of;
 
 use crate::types::Type;
 use std::convert::TryInto;
-
+#[derive(Debug)]
 pub enum Constant {
     Value([u8; 16]),
     String(Box<str>),
@@ -36,6 +36,7 @@ impl From<Type> for Constant {
 /// Pool of constants of specific module
 ///
 /// Essentially new-type around `Vec<`[`Constant`](self::Constant)`>`
+#[derive(Debug)]
 pub struct ConstantPool(Vec<Constant>);
 
 impl ConstantPool {
