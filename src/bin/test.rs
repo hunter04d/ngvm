@@ -4,7 +4,7 @@ use ngvm::types::Type::*;
 use ngvm::{Code, ConstantPool, Module, Vm};
 
 fn main() {
-    let pool = ConstantPool::new(vec![F32.into(), 10.0_f32.into(), 20.0_f32.into()]);
+    let pool: = ConstantPool::new(vec![F32.into(), 10.0_f32.into(), 20.0_f32.into()]);
     // spin up a vm instance
     println!("{:?}", pool);
     let mut vm = Vm::with_module(Module::new(pool));

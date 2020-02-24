@@ -271,6 +271,16 @@ pub(super) fn handle_f_neg(chunk: &Chunk, vm: &mut Vm) -> usize {
     1 + refs(2)
 }
 
+pub(super) fn handle_ld_true(_: &Chunk, vm: &mut Vm) -> usize {
+    vm.push_single_stack_value(true.into());
+    1
+}
+
+pub(super) fn handle_ld_false(_: &Chunk, vm: &mut Vm) -> usize {
+    vm.push_single_stack_value(false.into());
+    1
+}
+
 /// For debug only
 pub(super) fn handle_trace_stack_value(chunk: &Chunk, vm: &mut Vm) -> usize {
     let stack_ref = chunk.read_ref(0);

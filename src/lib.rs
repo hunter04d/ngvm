@@ -71,7 +71,7 @@ impl Vm {
         self.stack.push(v);
     }
 
-    pub fn push_wide_stack_value(&mut self, v: StackValue, second: [u8; 16]) {
+    pub fn push_wide_stack_value(&mut self, v: StackValue, second: StackBytes) {
         self.last_pushed_value += 1;
         self.stack.push(v);
         // SAFETY: this is probably bad

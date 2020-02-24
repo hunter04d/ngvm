@@ -50,6 +50,16 @@ impl TryFrom<StackBytes> for StackValue {
     }
 }
 
+impl From<bool> for StackValue {
+    fn from(b: bool) -> Self {
+        let mut data: [u8; 8] = Default::default();
+        if b {
+            data[0] |= 0b01;
+        }
+        StackValue::new(Type::Bool, data)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use pretty_assertions::{assert_eq, assert_ne};

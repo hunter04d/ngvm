@@ -13,9 +13,9 @@ pub(crate) static HANDLERS: [fn(&Chunk, &mut Vm) -> usize; 256] = [
     handle_i64_ld0,           // 1
     handle_ld_typed0,         // 2
     handle_ld_type,           // 3
-    noop,                     // 4
-    noop,                     // 5
-    noop,                     // 6
+    handle_ld_unit,           // 4
+    handle_ld_true,           // 5
+    handle_ld_false,          // 6
     noop,                     // 7
     noop,                     // 8
     noop,                     // 9

@@ -1,7 +1,7 @@
 use functions::*;
 
 use crate::code::Chunk;
-use crate::opcodes::refs;
+use crate::opcodes::{refs, Opcode};
 
 pub(crate) mod functions;
 
@@ -288,6 +288,13 @@ impl DecodeResult {
     }
 
     pub(crate) fn no_refs(repr: String) -> Self {
-        Self { consumed: 0, repr }
+        Self { consumed: 1, repr }
+    }
+
+    pub(crate) fn from_no_refs(op: Opcode) -> Self {
+        Self {
+            consumed: 1,
+            repr: format!("{:?}", op),
+        }
     }
 }

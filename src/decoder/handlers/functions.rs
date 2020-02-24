@@ -81,6 +81,14 @@ pub(super) fn decode_f_neg(chunk: &Chunk) -> DecodeResult {
     DecodeResult::with_refs(1, repr)
 }
 
+pub(super) fn decode_ld_true(chunk: &Chunk) -> DecodeResult {
+    DecodeResult::no_refs(format!("{:?}", Opcode::LdTrue))
+}
+
+pub(super) fn decode_ld_false(chunk: &Chunk) -> DecodeResult {
+    DecodeResult::no_refs(format!("{:?}", Opcode::LdFalse))
+}
+
 pub(crate) fn noop(_: &Chunk) -> DecodeResult {
     panic!("unknown opcode");
 }

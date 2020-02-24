@@ -35,12 +35,22 @@ pub enum Opcode {
     FRem = 25,
     FNeg = 26,
 
-    //Todo: bool ops
+    // Todo: bool ops
     BAnd = 27,
     BOr = 28,
     BNot = 29,
     BXor = 30,
+    // Todo: Logical ops
+    LAnd = 31,
+    LOr = 32,
+    LNot = 33,
+    LXor = 34,
+
     // Todo: shifts,
+    Shl = 35,
+    Shr = 36,
+    RotL = 37,
+    RotR = 38,
     TraceStackValue = 254,
     HWide = 255,
 }

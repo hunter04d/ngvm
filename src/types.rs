@@ -47,7 +47,7 @@ pub enum Type {
 }
 
 impl Type {
-    pub fn is_signed(&self) -> bool {
+    pub fn is_signed(self) -> bool {
         use Type::*;
         match self {
             I8 | I16 | I32 | I64 => true,
@@ -55,7 +55,7 @@ impl Type {
         }
     }
 
-    pub fn is_float(&self) -> bool {
+    pub fn is_float(self) -> bool {
         use Type::*;
         match self {
             F32 | F64 => true,
@@ -63,7 +63,7 @@ impl Type {
         }
     }
 
-    pub fn is_unsigned(&self) -> bool {
+    pub fn is_unsigned(self) -> bool {
         use Type::*;
         match self {
             U8 | U16 | U32 | U64 => true,
@@ -71,7 +71,7 @@ impl Type {
         }
     }
 
-    pub fn is_bool(&self) -> bool {
+    pub fn is_bool(self) -> bool {
         if let Type::Bool = self {
             true
         } else {
@@ -79,16 +79,12 @@ impl Type {
         }
     }
 
-    pub fn is_number(&self) -> bool {
-        if self.is_signed() || self.is_unsigned() || self.is_float() {
-            true
-        } else {
-            false
-        }
+    pub fn is_number(self) -> bool {
+        self.is_signed() || self.is_unsigned() || self.is_float()
     }
 
     /// Types that are guarantied to occupy one stack value space
-    pub fn is_single(&self) -> bool {
+    pub fn is_single(self) -> bool {
         use Type::*;
         if self.is_number() {
             true
