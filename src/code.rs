@@ -1,10 +1,12 @@
 use std::convert::TryInto;
 use std::mem::size_of;
 
+use crate::decoder::decode_result::{PoolRef, StackRef};
 use crate::decoder::HANDLERS as D_HANDLERS;
 use crate::interpreter::HANDLERS as I_HANDLERS;
 use crate::model;
 use crate::Vm;
+
 /// Byte-code of this machine
 pub struct Code(Vec<u8>);
 
@@ -47,6 +49,15 @@ impl<'a> Chunk<'a> {
     pub(crate) fn read_ref(&self, index: usize) -> usize {
         self.read_ref_from_offset(1 + index * size_of::<usize>())
     }
+
+    pub(crate) fn read_ref_pool(&self, index: usize) -> PoolRef {
+        self.read_ref(index).into()
+    }
+
+    pub(crate) fn read_ref_stack(&self, index: usize) -> StackRef {
+        self.read_ref(index).into()
+    }
+
     pub(crate) fn read_ref_from_offset(&self, offset: usize) -> usize {
         let bytes: [u8; size_of::<usize>()] = self.bytes
             [self.offset + offset..self.offset + offset + size_of::<usize>()]

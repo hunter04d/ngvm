@@ -108,18 +108,21 @@ impl Module {
     }
 }
 
+#[allow(dead_code)]
 pub struct Function {
     signature: Signature,
     bytecode: Code,
 }
 
 #[derive(Eq, PartialEq, Hash)]
+#[allow(dead_code)]
 pub struct Signature {
     name: String,
     params: (),
     return_type: (),
 }
 
+#[allow(dead_code)]
 pub struct ObjectDefinition {
     vtable: HashMap<Signature, Function>,
 }

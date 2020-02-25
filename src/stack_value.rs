@@ -62,7 +62,7 @@ impl From<bool> for StackValue {
 
 #[cfg(test)]
 mod tests {
-    use pretty_assertions::{assert_eq, assert_ne};
+    use pretty_assertions::assert_eq;
 
     use super::*;
     use crate::stack_data::StackBytes;

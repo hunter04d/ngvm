@@ -65,11 +65,9 @@ mod tests {
     use std::convert::TryFrom;
     use std::fmt::{self, Write};
 
-    use pretty_assertions::{assert_eq, assert_ne};
-
-    use crate::decoder::handlers::functions::noop as d_noop;
+    use crate::decoder::handlers::noop as d_noop;
     use crate::decoder::HANDLERS as D_HANDLERS;
-    use crate::interpreter::handlers::functions::noop as i_noop;
+    use crate::interpreter::handlers::noop as i_noop;
     use crate::interpreter::HANDLERS as I_HANDLERS;
 
     use super::*;
