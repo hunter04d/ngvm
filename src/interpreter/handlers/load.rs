@@ -1,7 +1,7 @@
-use crate::{StackValue, Vm};
-use crate::types::Type;
 use crate::code::Chunk;
 use crate::opcodes::refs;
+use crate::types::Type;
+use crate::{StackValue, Vm};
 
 pub(in crate::interpreter) fn handle_u64_ld0(_: &Chunk, vm: &mut Vm) -> usize {
     vm.push_single_stack_value(StackValue::default_with_type(Type::U64));

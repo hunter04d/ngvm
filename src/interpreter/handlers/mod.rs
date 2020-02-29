@@ -1,12 +1,10 @@
-use crate::code::Chunk;
-use crate::Vm;
 use super::stack_tracer::StackTracer;
+use crate::code::Chunk;
 use crate::opcodes::refs;
+use crate::Vm;
 
-
-pub(in crate::interpreter) mod math;
 pub(in crate::interpreter) mod load;
-
+pub(in crate::interpreter) mod math;
 
 /// For debug only
 pub(super) fn handle_trace_stack_value(chunk: &Chunk, vm: &mut Vm) -> usize {

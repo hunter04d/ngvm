@@ -1,10 +1,9 @@
-use std::mem::size_of;
 use std::ops::Neg;
 
 use crate::code::Chunk;
 use crate::opcodes::refs;
+use crate::stack_data::{FromSingle, IntoStackData};
 use crate::types::Type;
-use crate::stack_data::FromSingle;
 use crate::Vm;
 
 macro_rules! handle_i_op {
@@ -14,33 +13,30 @@ macro_rules! handle_i_op {
         let op2 = $vm.stack_value($chunk.read_ref(2));
         let res = $vm.stack_value(res_ref);
         if res.value_type == op1.value_type && op1.value_type == op2.value_type {
-            match res.value_type {
+            $vm.stack_value_mut(res_ref).data = match res.value_type {
                 Type::I64 => {
                     let op1 = i64::from_single(op1.data);
                     let op2 = i64::from_single(op2.data);
                     let r = op1.$op(op2).expect("Overflow error");
-                    $vm.stack_value_mut(res_ref).data = r.to_le_bytes();
+                    r.into_stack_data()
                 }
                 Type::I32 => {
-                    const S: usize = size_of::<i32>();
                     let op1 = i32::from_single(op1.data);
                     let op2 = i32::from_single(op2.data);
                     let r = op1.$op(op2).expect("Overflow error");
-                    $vm.stack_value_mut(res_ref).data[..S].copy_from_slice(&r.to_le_bytes());
+                    r.into_stack_data()
                 }
                 Type::I16 => {
-                    const S: usize = size_of::<i16>();
                     let op1 = i16::from_single(op1.data);
                     let op2 = i16::from_single(op2.data);
                     let r = op1.$op(op2).expect("Overflow error");
-                    $vm.stack[res_ref].data[..S].copy_from_slice(&r.to_le_bytes());
+                    r.into_stack_data()
                 }
                 Type::I8 => {
-                    const S: usize = size_of::<i8>();
                     let op1 = i8::from_single(op1.data);
                     let op2 = i8::from_single(op2.data);
                     let r = op1.$op(op2).expect("Overflow error");
-                    $vm.stack[res_ref].data[..S].copy_from_slice(&r.to_le_bytes());
+                    r.into_stack_data()
                 }
                 _ => panic!("Type mismatch"),
             }
@@ -69,7 +65,6 @@ handle_i_ops! {
     handle_i_rem => checked_rem
 }
 
-
 pub(in crate::interpreter) fn handle_i_neg(chunk: &Chunk, vm: &mut Vm) -> usize {
     let res_ref = chunk.read_ref(0);
     let op_ref = chunk.read_ref(1);
@@ -79,22 +74,19 @@ pub(in crate::interpreter) fn handle_i_neg(chunk: &Chunk, vm: &mut Vm) -> usize 
         match res.value_type {
             Type::I64 => {
                 let op: i64 = i64::from_single(op.data);
-                vm.stack_value_mut(res_ref).data = i64::to_le_bytes(op.neg());
+                vm.stack_value_mut(res_ref).data = op.neg().into_stack_data();
             }
             Type::I32 => {
-                const S: usize = size_of::<i32>();
                 let r = -i32::from_single(op.data);
-                vm.stack_value_mut(res_ref).data[..S].copy_from_slice(&r.to_le_bytes());
+                vm.stack_value_mut(res_ref).data= r.into_stack_data();
             }
             Type::I16 => {
-                const S: usize = size_of::<i16>();
-                let r = -i16::from_single(op.data);
-                vm.stack_value_mut(res_ref).data[..S].copy_from_slice(&r.to_le_bytes());
+                let r = i16::from_single(op.data).neg();
+                vm.stack_value_mut(res_ref).data = r.into_stack_data();
             }
             Type::I8 => {
-                const S: usize = size_of::<i8>();
                 let r = -i8::from_single(op.data);
-                vm.stack_value_mut(res_ref).data[..S].copy_from_slice(&r.to_le_bytes());
+                vm.stack_value_mut(res_ref).data = r.into_stack_data();
             }
             _ => panic!("Type mismatch"),
         }

@@ -1,7 +1,7 @@
-use handlers::{*, load::*, math::f_ops::*, math::i_ops::*, math::u_ops::*};
+use handlers::{load::*, math::f_ops::*, math::i_ops::*, math::u_ops::*, *};
 
-use crate:: Vm;
 use crate::code::Chunk;
+use crate::Vm;
 
 pub mod handlers;
 pub mod stack_tracer;

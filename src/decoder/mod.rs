@@ -3,8 +3,8 @@ use handlers::*;
 
 use crate::code::Chunk;
 
-pub mod handlers;
 pub(crate) mod decode_result;
+pub mod handlers;
 
 /// All the functions than handle the specific opcode
 pub(crate) static HANDLERS: [fn(&Chunk) -> DecodeResult; 256] = [
@@ -13,8 +13,8 @@ pub(crate) static HANDLERS: [fn(&Chunk) -> DecodeResult; 256] = [
     decode_ld_type0,          // 2
     decode_ld_type,           // 3
     decode_ld_unit,           // 4
-    decode_ld_true,                     // 5
-    decode_ld_false,                     // 6
+    decode_ld_true,           // 5
+    decode_ld_false,          // 6
     noop,                     // 7
     noop,                     // 8
     noop,                     // 9
@@ -266,4 +266,3 @@ pub(crate) static HANDLERS: [fn(&Chunk) -> DecodeResult; 256] = [
     // Handle two-byte instruction
     decode_wide, // 255
 ];
-
