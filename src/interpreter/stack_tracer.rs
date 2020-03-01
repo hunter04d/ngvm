@@ -1,22 +1,22 @@
 use std::fmt::{self, Debug, Formatter};
 
-use crate::stack_data::FromSingle;
+use crate::stack::data::{FromSingle, StackData};
+use crate::stack::metadata::StackMetadata;
 use crate::types::Type;
-use crate::StackValue;
 
 /// Traces the stack value contained starting from slice
-pub struct StackTracer<'a>(pub &'a [StackValue]);
+pub struct StackTracer<'a>(pub &'a [StackData], pub &'a StackMetadata);
 
 impl<'a> Debug for StackTracer<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let stack = self.0;
-        let cell_0 = &stack[0];
-        let data_0 = cell_0.data;
+        let data_0 = stack[0];
+        let value_type = self.1.value_type;
         let alt = f.alternate();
         let mut s = f.debug_struct("stack_value");
-        s.field("type", &cell_0.value_type);
+        s.field("type", &value_type);
         if alt {
-            let repr: Box<dyn Debug> = match cell_0.value_type {
+            let repr: Box<dyn Debug> = match value_type {
                 Type::StackFrame => todo!(),
                 Type::ReturnAddr => todo!(),
                 Type::Unit => Box::new("(unit)"),
@@ -37,7 +37,7 @@ impl<'a> Debug for StackTracer<'a> {
             };
             s.field("data", &repr);
         } else {
-            s.field("data", &cell_0.data);
+            s.field("data", &data_0);
         }
         s.finish()
     }

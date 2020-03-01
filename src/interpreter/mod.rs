@@ -1,10 +1,13 @@
-use handlers::{load::*, math::f_ops::*, math::i_ops::*, math::u_ops::*, *};
+use handlers::{alu::f_ops::*, alu::i_ops::*, alu::u_ops::*, load::*, *};
 
 use crate::code::Chunk;
+use crate::refs::{ThreeRefs, TwoRefs};
+use crate::stack::metadata::StackMetadata;
 use crate::Vm;
 
 pub mod handlers;
 pub mod stack_tracer;
+
 /// All the functions than handle the specific opcode
 pub(crate) static HANDLERS: [fn(&Chunk, &mut Vm) -> usize; 256] = [
     // U64 LD 0
@@ -267,3 +270,27 @@ pub(crate) static HANDLERS: [fn(&Chunk, &mut Vm) -> usize; 256] = [
     // Handle two-byte instruction
     handle_wide, // 255
 ];
+
+struct ThreeStackMetadata<'a> {
+    result: &'a StackMetadata,
+    op1: &'a StackMetadata,
+    op2: &'a StackMetadata,
+}
+
+struct TwoStackMetadata<'a> {
+    result: &'a StackMetadata,
+    op: &'a StackMetadata,
+}
+
+fn three_stack_metadata<'a>(vm: &'a Vm, refs: &ThreeRefs) -> Option<ThreeStackMetadata<'a>> {
+    let result = vm.stack_metadata(refs.result)?;
+    let op1 = vm.stack_metadata(refs.op1)?;
+    let op2 = vm.stack_metadata(refs.op2)?;
+    Some(ThreeStackMetadata { result, op1, op2 })
+}
+
+fn two_stack_metadata<'a>(vm: &'a Vm, refs: &TwoRefs) -> Option<TwoStackMetadata<'a>> {
+    let result = vm.stack_metadata(refs.result)?;
+    let op = vm.stack_metadata(refs.op)?;
+    Some(TwoStackMetadata { result, op })
+}

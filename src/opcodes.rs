@@ -1,5 +1,4 @@
 use num_enum::{IntoPrimitive, TryFromPrimitive};
-use std::mem::size_of;
 
 #[repr(u8)]
 #[derive(Debug, Eq, PartialEq, Copy, Clone, IntoPrimitive, TryFromPrimitive)]
@@ -39,26 +38,34 @@ pub enum Opcode {
     BAnd = 27,
     BOr = 28,
     BNot = 29,
-    BXor = 30,
+    BBe = 30,
+    BXor = 31,
     // Todo: Logical ops
-    LAnd = 31,
-    LOr = 32,
-    LNot = 33,
-    LXor = 34,
+    LAnd = 32,
+    LOr = 33,
+    LNot = 34,
+    LXor = 35,
 
     // Todo: shifts,
-    Shl = 35,
-    Shr = 36,
-    RotL = 37,
-    RotR = 38,
+    Shl = 36,
+    Shr = 37,
+    RotL = 38,
+    RotR = 39,
+    // TODO: comparisons
+    Ge = 40,
+    Gt = 41,
+    Le = 42,
+    Lt = 43,
+    Eq = 44,
+    Ne = 45,
+
     TraceStackValue = 254,
     HWide = 255,
 }
 
-/// Return the amount of bytes `n_refs` takes in the bytecode
-pub const fn refs(n_refs: usize) -> usize {
-    n_refs * size_of::<usize>()
-}
+/// Type of the reference to a value in bytecode
+pub type Ref = usize;
+
 
 #[cfg(test)]
 mod tests {

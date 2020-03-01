@@ -1,18 +1,19 @@
 use super::stack_tracer::StackTracer;
 use crate::code::Chunk;
-use crate::opcodes::refs;
 use crate::Vm;
+use crate::refs::refs;
 
+pub(in crate::interpreter) mod alu;
 pub(in crate::interpreter) mod load;
-pub(in crate::interpreter) mod math;
 
 /// For debug only
 pub(super) fn handle_trace_stack_value(chunk: &Chunk, vm: &mut Vm) -> usize {
-    let stack_ref = chunk.read_ref(0);
+    let stack_ref = chunk.read_ref(0).unwrap();
+    let meta = vm.stack_metadata(stack_ref).unwrap();
     eprintln!(
         "Trace @{}: {:#?}",
         stack_ref,
-        StackTracer(&vm.stack[stack_ref..])
+        StackTracer(&vm.stack[meta.index..], meta)
     );
     1 + refs(1)
 }

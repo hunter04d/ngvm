@@ -4,9 +4,6 @@ use std::mem::size_of;
 /// Data type of the stack data
 pub(crate) type StackData = [u8; 8];
 
-/// Data type of one stack cell
-pub(crate) type StackBytes = [u8; 16];
-
 pub(crate) trait FromSingle<T> {
     fn from_single(obj: T) -> Self;
 }
@@ -67,7 +64,6 @@ impl<T: FromSingle<StackData>> IntoPrimitive<T> for StackData {
 macro_rules! derive_from_primitive_for_types {
     ($($t: ty),*) => {
         $(impl FromPrimitive<$t> for StackData {
-            #[inline]
             fn from_primitive(obj: $t) -> Self {
                 const S: usize = size_of::<$t>();
                 let mut res = StackData::default();
@@ -86,5 +82,15 @@ where
 {
     fn into_stack_data(self) -> StackData {
         StackData::from_primitive(self)
+    }
+}
+
+impl IntoStackData for bool {
+    fn into_stack_data(self) -> StackData {
+        let mut data: StackData = Default::default();
+        if self {
+            data[0] |= 0b01;
+        }
+        data
     }
 }

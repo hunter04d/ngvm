@@ -5,6 +5,8 @@ use crate::decoder::decode_result::{PoolRef, StackRef};
 use crate::decoder::HANDLERS as D_HANDLERS;
 use crate::interpreter::HANDLERS as I_HANDLERS;
 use crate::model;
+use crate::opcodes::Ref;
+use crate::refs::{ThreeRefs, TwoRefs};
 use crate::Vm;
 
 /// Byte-code of this machine
@@ -46,24 +48,37 @@ impl<'a> Chunk<'a> {
     }
 
     #[inline]
-    pub(crate) fn read_ref(&self, index: usize) -> usize {
+    pub(crate) fn read_ref(&self, index: usize) -> Option<Ref> {
         self.read_ref_from_offset(1 + index * size_of::<usize>())
     }
 
-    pub(crate) fn read_ref_pool(&self, index: usize) -> PoolRef {
-        self.read_ref(index).into()
+    pub(crate) fn read_two(&self) -> Option<TwoRefs> {
+        let result = self.read_ref(0)?;
+        let op = self.read_ref(1)?;
+        Some(TwoRefs { result, op })
     }
 
-    pub(crate) fn read_ref_stack(&self, index: usize) -> StackRef {
-        self.read_ref(index).into()
+    pub(crate) fn read_three(&self) -> Option<ThreeRefs> {
+        let result = self.read_ref(0)?;
+        let op1 = self.read_ref(1)?;
+        let op2 = self.read_ref(2)?;
+        Some(ThreeRefs { result, op1, op2 })
     }
 
-    pub(crate) fn read_ref_from_offset(&self, offset: usize) -> usize {
-        let bytes: [u8; size_of::<usize>()] = self.bytes
-            [self.offset + offset..self.offset + offset + size_of::<usize>()]
+    pub(crate) fn read_ref_pool(&self, index: usize) -> Option<PoolRef> {
+        self.read_ref(index).map(|v| v.into())
+    }
+
+    pub(crate) fn read_ref_stack(&self, index: usize) -> Option<StackRef> {
+        self.read_ref(index).map(|v| v.into())
+    }
+
+    pub(crate) fn read_ref_from_offset(&self, offset: usize) -> Option<Ref> {
+        let bytes: [u8; size_of::<Ref>()] = self.bytes
+            [self.offset + offset..self.offset + offset + size_of::<Ref>()]
             .try_into()
-            .expect("Invalid chuck of bytecode");
-        usize::from_le_bytes(bytes)
+            .ok()?;
+        Some(Ref::from_le_bytes(bytes))
     }
 }
 

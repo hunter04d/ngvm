@@ -1,4 +1,5 @@
-use crate::opcodes::{refs, Opcode};
+use crate::opcodes::Opcode;
+use crate::refs::refs;
 use std::fmt::{self, Display, Formatter};
 
 /// The result of the decoding the input stream

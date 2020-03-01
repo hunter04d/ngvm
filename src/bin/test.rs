@@ -1,6 +1,6 @@
-use ngvm::model::refs::three;
 use ngvm::model::Opcode::*;
 use ngvm::types::Type::*;
+use ngvm::refs::{three};
 use ngvm::{Code, ConstantPool, Module, Vm};
 
 fn main() {

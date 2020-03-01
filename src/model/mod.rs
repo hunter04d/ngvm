@@ -4,10 +4,8 @@ use std::mem::size_of;
 
 use Opcode::*;
 
-use crate::model::refs::ThreeRefs;
 use crate::opcodes::Opcode as Nc;
-
-pub mod refs;
+use crate::refs::ThreeRefs;
 
 /// Vm opcode represented as Rust enum (size constraints be dammed)
 #[derive(Debug)]

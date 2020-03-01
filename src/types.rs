@@ -96,6 +96,87 @@ impl Type {
             }
         }
     }
+
+    pub fn is_primitive(self) -> bool {
+        self.is_single()
+    }
+}
+
+/// Gets the vm type from a value
+pub trait HasVmType {
+    fn get_type() -> Type;
+}
+
+impl HasVmType for f64 {
+    fn get_type() -> Type {
+        Type::F64
+    }
+}
+
+impl HasVmType for f32 {
+    fn get_type() -> Type {
+        Type::F32
+    }
+}
+
+impl HasVmType for bool {
+    fn get_type() -> Type {
+        Type::Bool
+    }
+}
+
+impl HasVmType for char {
+    fn get_type() -> Type {
+        Type::Char
+    }
+}
+
+impl HasVmType for u64 {
+    fn get_type() -> Type {
+        Type::U64
+    }
+}
+
+impl HasVmType for u32 {
+    fn get_type() -> Type {
+        Type::U32
+    }
+}
+
+impl HasVmType for u16 {
+    fn get_type() -> Type {
+        Type::U16
+    }
+}
+
+impl HasVmType for u8 {
+    fn get_type() -> Type {
+        Type::U8
+    }
+}
+
+impl HasVmType for i64 {
+    fn get_type() -> Type {
+        Type::I64
+    }
+}
+
+impl HasVmType for i32 {
+    fn get_type() -> Type {
+        Type::I32
+    }
+}
+
+impl HasVmType for i16 {
+    fn get_type() -> Type {
+        Type::I16
+    }
+}
+
+impl HasVmType for i8 {
+    fn get_type() -> Type {
+        Type::I8
+    }
 }
 
 #[allow(unused_macros)]
