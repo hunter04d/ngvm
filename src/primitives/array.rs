@@ -34,7 +34,7 @@ impl<T: Default> HeapArray<T> {
 
 impl<T> HeapArray<T> {
     pub fn new(size: usize, mut init_fn: impl FnMut() -> T) -> Self {
-        let ptr = allocate_memory::<T>(size).unwrap();
+        let ptr = allocate_memory::<T>(size).expect("Allocation error");
         unsafe {
             // write len at *ptr
             ptr.as_ptr().cast::<usize>().write(size);
@@ -135,7 +135,8 @@ impl<T> IndexMut<usize> for HeapArray<T> {
 #[inline]
 fn allocate_memory<T>(n: usize) -> Result<NonNull<u8>, AllocErr> {
     let layout = get_layout::<T>(n).unwrap();
-    unsafe { System.alloc(layout) }
+    // we ignore the size allocated as it is guarantied to be at least enough to get fit n of Ts
+    unsafe { Ok(System.alloc(layout)?.0) }
 }
 
 #[inline]

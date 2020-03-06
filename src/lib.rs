@@ -14,6 +14,7 @@ pub mod opcodes;
 pub mod primitives;
 pub mod types;
 pub mod refs;
+pub mod operations;
 
 mod code;
 mod constant;
