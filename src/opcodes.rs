@@ -35,7 +35,8 @@ pub enum Opcode {
     FNeg = 26,
 
     // Todo: bool ops
-    // the behaviour of those ops are type independent assuming the type is a primitive
+    // the behaviour of those ops are type independent,
+    // assuming the type is a primitive
     BAnd = 27,
     BOr = 28,
     BNot = 29,
@@ -66,7 +67,6 @@ pub enum Opcode {
 
 /// Type of the reference to a value in bytecode
 pub type Ref = usize;
-
 
 #[cfg(test)]
 mod tests {

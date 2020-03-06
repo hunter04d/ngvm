@@ -47,9 +47,12 @@ impl<'a> Chunk<'a> {
         self.bytes[self.offset]
     }
 
+    /// Reads a `Ref` from bytecode
+    ///
+    /// `index` is the index of the ref in the bytecode
     #[inline]
     pub(crate) fn read_ref(&self, index: usize) -> Option<Ref> {
-        self.read_ref_from_offset(1 + index * size_of::<usize>())
+        self.read_ref_from_offset(1 + index * size_of::<Ref>())
     }
 
     pub(crate) fn read_two(&self) -> Option<TwoRefs> {
@@ -74,10 +77,10 @@ impl<'a> Chunk<'a> {
     }
 
     pub(crate) fn read_ref_from_offset(&self, offset: usize) -> Option<Ref> {
-        let bytes: [u8; size_of::<Ref>()] = self.bytes
-            [self.offset + offset..self.offset + offset + size_of::<Ref>()]
-            .try_into()
-            .ok()?;
+        const S: usize = size_of::<Ref>();
+        // full offset to read the Ref from
+        let offset = self.offset + offset;
+        let bytes: [u8; S] = self.bytes[offset..offset + S].try_into().ok()?;
         Some(Ref::from_le_bytes(bytes))
     }
 }

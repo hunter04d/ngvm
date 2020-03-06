@@ -25,7 +25,6 @@ pub const fn two(result: Ref, op: Ref) -> TwoRefs {
     TwoRefs { result, op }
 }
 
-
 /// Return the amount of bytes `n_refs` takes in the bytecode
 pub const fn refs(n_refs: Ref) -> usize {
     n_refs * size_of::<Ref>()

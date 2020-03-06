@@ -1,7 +1,7 @@
 use super::stack_tracer::StackTracer;
 use crate::code::Chunk;
-use crate::Vm;
 use crate::refs::refs;
+use crate::Vm;
 
 pub(in crate::interpreter) mod alu;
 pub(in crate::interpreter) mod load;

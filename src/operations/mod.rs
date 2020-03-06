@@ -1,18 +1,19 @@
+use std::fmt::Debug;
 
-mod blankets;
+pub mod blankets;
 pub mod markers;
-pub trait BiOpMarker {}
+pub trait BiOpMarker: Debug {}
 
-pub trait BiOp<'a, M : BiOpMarker, Other = &'a Self> {
+pub trait BiOp<M: BiOpMarker, Other = Self> {
     type Output;
 
-    fn invoke(&self, other: Other) -> Self::Output;
+    fn invoke(self, other: Other) -> Self::Output;
 }
 
 pub trait UOpMarker {}
 
-pub trait UOp<M : UOpMarker> {
+pub trait UOp<M: UOpMarker> {
     type Output;
 
-    fn invoke(&self) -> Self::Output;
+    fn invoke(self) -> Self::Output;
 }

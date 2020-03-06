@@ -1,5 +1,6 @@
 #![feature(allocator_api)]
 #![feature(alloc_layout_extra)]
+#![feature(try_trait)]
 
 use std::collections::HashMap;
 
@@ -8,13 +9,14 @@ pub use constant::{Constant, ConstantPool};
 pub use vm::Vm;
 
 pub mod decoder;
+pub mod error;
 pub mod interpreter;
 pub mod model;
 pub mod opcodes;
-pub mod primitives;
-pub mod types;
-pub mod refs;
 pub mod operations;
+pub mod primitives;
+pub mod refs;
+pub mod types;
 
 mod code;
 mod constant;

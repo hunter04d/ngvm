@@ -1,6 +1,7 @@
-use handlers::{alu::f_ops::*, alu::i_ops::*, alu::u_ops::*, load::*, *};
+use handlers::{alu::f_ops::*, alu::i_ops::*, alu::shifts::*, alu::u_ops::*, load::*, *};
 
 use crate::code::Chunk;
+use crate::interpreter::handlers::alu::handle_b_not;
 use crate::refs::{ThreeRefs, TwoRefs};
 use crate::stack::metadata::StackMetadata;
 use crate::Vm;
@@ -41,17 +42,17 @@ pub(crate) static HANDLERS: [fn(&Chunk, &mut Vm) -> usize; 256] = [
     handle_f_neg,             // 26
     noop,                     // 27
     noop,                     // 28
-    noop,                     // 29
+    handle_b_not,             // 29
     noop,                     // 30
     noop,                     // 31
     noop,                     // 32
     noop,                     // 33
     noop,                     // 34
     noop,                     // 35
-    noop,                     // 36
-    noop,                     // 37
-    noop,                     // 38
-    noop,                     // 39
+    handle_shl,               // 36
+    handle_shr,               // 37
+    handle_rotl,              // 38
+    handle_rotr,              // 39
     noop,                     // 40
     noop,                     // 41
     noop,                     // 42
