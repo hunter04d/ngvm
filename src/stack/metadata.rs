@@ -10,4 +10,8 @@ impl StackMetadata {
     pub fn new(value_type: Type, index: usize) -> Self {
         StackMetadata { value_type, index }
     }
+
+    pub fn is_single(&self) -> bool {
+        self.value_type.is_single()
+    }
 }

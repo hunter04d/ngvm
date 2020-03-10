@@ -1,6 +1,7 @@
 use handlers::{alu::f_ops::*, alu::i_ops::*, alu::shifts::*, alu::u_ops::*, load::*, *};
 
 use crate::code::Chunk;
+use crate::error::VmError;
 use crate::interpreter::handlers::alu::handle_b_not;
 use crate::refs::{ThreeRefs, TwoRefs};
 use crate::stack::metadata::StackMetadata;
@@ -10,7 +11,7 @@ pub mod handlers;
 pub mod stack_tracer;
 
 /// All the functions than handle the specific opcode
-pub(crate) static HANDLERS: [fn(&Chunk, &mut Vm) -> usize; 256] = [
+pub(crate) static HANDLERS: [fn(&Chunk, &mut Vm) -> InterpreterResult; 256] = [
     // U64 LD 0
     handle_u64_ld0, // 0
     // I64 LD 0
@@ -272,6 +273,50 @@ pub(crate) static HANDLERS: [fn(&Chunk, &mut Vm) -> usize; 256] = [
     handle_wide, // 255
 ];
 
+#[derive(Debug)]
+pub(crate) struct InterpreterResult {
+    pub(crate) consumed: usize,
+    pub(crate) error: Option<VmError>,
+}
+
+impl InterpreterResult {
+    fn new(consumed: usize) -> Self {
+        Self {
+            consumed,
+            error: None,
+        }
+    }
+
+    #[allow(dead_code)]
+    fn new_with_error(consumed: usize, error: VmError) -> Self {
+        Self {
+            consumed,
+            error: Some(error),
+        }
+    }
+
+    #[allow(dead_code)]
+    fn with_error(self, error: VmError) -> Self {
+        Self {
+            consumed: self.consumed,
+            error: Some(error),
+        }
+    }
+    fn with_error_opt(self, error: Option<VmError>) -> Self {
+        Self {
+            consumed: self.consumed,
+            error,
+        }
+    }
+}
+
+impl From<usize> for InterpreterResult {
+    #[inline]
+    fn from(consumed: usize) -> Self {
+        Self::new(consumed)
+    }
+}
+
 struct ThreeStackMetadata<'a> {
     result: &'a StackMetadata,
     op1: &'a StackMetadata,
@@ -283,15 +328,22 @@ struct TwoStackMetadata<'a> {
     op: &'a StackMetadata,
 }
 
-fn three_stack_metadata<'a>(vm: &'a Vm, refs: &ThreeRefs) -> Option<ThreeStackMetadata<'a>> {
+fn three_stack_metadata<'a>(
+    vm: &'a Vm,
+    refs: &ThreeRefs,
+) -> Result<ThreeStackMetadata<'a>, VmError> {
     let result = vm.stack_metadata(refs.result)?;
     let op1 = vm.stack_metadata(refs.op1)?;
     let op2 = vm.stack_metadata(refs.op2)?;
-    Some(ThreeStackMetadata { result, op1, op2 })
+    Ok(ThreeStackMetadata { result, op1, op2 })
 }
 
-fn two_stack_metadata<'a>(vm: &'a Vm, refs: &TwoRefs) -> Option<TwoStackMetadata<'a>> {
+fn two_stack_metadata<'a>(vm: &'a Vm, refs: &TwoRefs) -> Result<TwoStackMetadata<'a>, VmError> {
     let result = vm.stack_metadata(refs.result)?;
     let op = vm.stack_metadata(refs.op)?;
-    Some(TwoStackMetadata { result, op })
+    Ok(TwoStackMetadata { result, op })
+}
+
+fn run<T, E>(fun: impl FnOnce() -> Result<T, E>) -> Result<T, E> {
+    fun()
 }

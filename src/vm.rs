@@ -1,3 +1,4 @@
+use crate::error::VmError;
 use crate::opcodes::Ref;
 use crate::stack::{data::StackData, metadata::StackMetadata};
 use crate::types::Type;
@@ -38,16 +39,25 @@ impl Vm {
         }
     }
 
-    pub fn stack_data(&self, index: usize) -> Option<&StackData> {
+    pub fn stack_data(&self, index: usize) -> Result<&StackData, VmError> {
+        self.stack
+            .get(self.last_stack_frame + index)
+            .ok_or(VmError::BadVmState)
+    }
+    pub fn stack_data_opt(&self, index: usize) -> Option<&StackData> {
         self.stack.get(self.last_stack_frame + index)
     }
 
-    pub fn stack_metadata(&self, index: Ref) -> Option<&StackMetadata> {
-        self.stack_metadata.get(self.last_stack_frame + index)
+    pub fn stack_metadata(&self, index: Ref) -> Result<&StackMetadata, VmError> {
+        self.stack_metadata
+            .get(self.last_stack_frame + index)
+            .ok_or(VmError::BadVmState)
     }
 
-    pub fn stack_data_mut(&mut self, index: usize) -> Option<&mut StackData> {
-        self.stack.get_mut(self.last_stack_frame + index)
+    pub fn stack_data_mut(&mut self, index: usize) -> Result<&mut StackData, VmError> {
+        self.stack
+            .get_mut(self.last_stack_frame + index)
+            .ok_or(VmError::BadVmState)
     }
 
     pub fn push_stack_data_with_type(&mut self, value: StackData, t: Type) {
@@ -55,6 +65,13 @@ impl Vm {
         self.stack_metadata
             .push(StackMetadata::new(t, self.stack.len()));
         self.stack.push(value);
+    }
+
+    pub fn push_default_with_type(&mut self, t: Type) {
+        self.last_pushed_value += 1;
+        self.stack_metadata
+            .push(StackMetadata::new(t, self.stack.len()));
+        self.stack.push(Default::default());
     }
 
     /// Pop the last stack value in its entirety from the stack

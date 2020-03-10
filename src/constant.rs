@@ -48,27 +48,27 @@ impl ConstantPool {
         self.0.get(index)
     }
 
-    pub fn get_type_or_panic(&self, index: usize) -> Type {
+    pub fn get_type(&self, index: usize) -> Option<Type> {
         if let Some(Constant::Type(t)) = self.get(index) {
-            *t
+            Some(*t)
         } else {
-            panic!("Invalid type ref")
+            None
         }
     }
 
-    pub fn get_single_or_panic(&self, index: usize) -> [u8; 8] {
+    pub fn get_single(&self, index: usize) -> Option<[u8; 8]> {
         if let Some(Constant::Value(v)) = self.get(index) {
-            v[..8].try_into().unwrap()
+            Some(v[..8].try_into().unwrap())
         } else {
-            panic!("Invalid value ref")
+            None
         }
     }
 
-    pub fn get_wide_or_panic(&self, index: usize) -> [u8; 16] {
+    pub fn get_wide(&self, index: usize) -> Option<[u8; 16]> {
         if let Some(Constant::Value(v)) = self.get(index) {
-            *v
+            Some(*v)
         } else {
-            panic!("Invalid wide value ref")
+            None
         }
     }
 }

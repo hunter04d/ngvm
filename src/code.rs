@@ -1,11 +1,11 @@
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 use std::mem::size_of;
 
 use crate::decoder::decode_result::{PoolRef, StackRef};
 use crate::decoder::HANDLERS as D_HANDLERS;
 use crate::interpreter::HANDLERS as I_HANDLERS;
 use crate::model;
-use crate::opcodes::Ref;
+use crate::opcodes::{Opcode, Ref};
 use crate::refs::{ThreeRefs, TwoRefs};
 use crate::Vm;
 
@@ -15,6 +15,7 @@ pub struct Code(Vec<u8>);
 /// Chunk of bytecode that is currently being interpreted.
 ///
 /// Used in handlers as an abstraction over the raw bytes.
+#[derive(Debug, Clone)]
 pub(crate) struct Chunk<'a> {
     bytes: &'a [u8],
     offset: usize,
@@ -33,7 +34,6 @@ impl<'a> Chunk<'a> {
         }
     }
 
-    #[allow(dead_code)]
     pub(crate) fn advance(&mut self, by: usize) {
         self.offset += by;
     }
@@ -45,6 +45,10 @@ impl<'a> Chunk<'a> {
     #[inline]
     pub(crate) fn opcode_value(&self) -> u8 {
         self.bytes[self.offset]
+    }
+
+    pub(crate) fn opcode(&self) -> Opcode {
+        Opcode::try_from(self.bytes[self.offset]).expect("Invalid opcode")
     }
 
     /// Reads a `Ref` from bytecode
@@ -83,6 +87,10 @@ impl<'a> Chunk<'a> {
         let bytes: [u8; S] = self.bytes[offset..offset + S].try_into().ok()?;
         Some(Ref::from_le_bytes(bytes))
     }
+
+    pub(crate) fn offset(&self) -> usize {
+        self.offset
+    }
 }
 
 impl Code {
@@ -113,9 +121,13 @@ impl Code {
         while vm.ip < chunk.bytes.len() {
             let op_fn = I_HANDLERS[chunk.opcode_value() as usize];
             let consumed = op_fn(&chunk, vm);
-            if consumed != 0 {
+            if let Some(e) = consumed.error {
+                eprint!("{:?}", e);
+                break;
+            };
+            if consumed.consumed != 0 {
                 // we consumed in a linear nature
-                vm.ip += consumed;
+                vm.ip += consumed.consumed;
             }
             chunk.set_offset(vm.ip);
         }
