@@ -1,4 +1,4 @@
-use std::alloc::{AllocErr, AllocRef, Layout, LayoutErr, System};
+use std::alloc::{AllocErr, AllocRef, Layout, LayoutErr, System, AllocInit};
 use std::fmt::{self, Debug, Formatter};
 use std::marker::PhantomData;
 use std::ops::{Index, IndexMut};
@@ -135,8 +135,8 @@ impl<T> IndexMut<usize> for HeapArray<T> {
 #[inline]
 fn allocate_memory<T>(n: usize) -> Result<NonNull<u8>, AllocErr> {
     let layout = get_layout::<T>(n).unwrap();
-    // we ignore the size allocated as it is guarantied to be at least enough to get fit n of Ts
-    unsafe { Ok(System.alloc(layout)?.0) }
+    // we ignore the size allocated as it is guarantied to be at least enough to fit n of Ts
+    unsafe { Ok(System.alloc(layout, AllocInit::Zeroed)?.ptr) }
 }
 
 #[inline]
