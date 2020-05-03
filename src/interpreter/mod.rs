@@ -3,7 +3,7 @@ use handlers::{alu::f_ops::*, alu::i_ops::*, alu::shifts::*, alu::u_ops::*, load
 use crate::code::Chunk;
 use crate::error::VmError;
 use crate::interpreter::handlers::alu::handle_b_not;
-use crate::refs::{ThreeRefs, TwoRefs};
+use crate::refs::{ThreeStackRefs, TwoStackRefs};
 use crate::stack::metadata::StackMetadata;
 use crate::Vm;
 
@@ -330,7 +330,7 @@ struct TwoStackMetadata<'a> {
 
 fn three_stack_metadata<'a>(
     vm: &'a Vm,
-    refs: &ThreeRefs,
+    refs: &ThreeStackRefs,
 ) -> Result<ThreeStackMetadata<'a>, VmError> {
     let result = vm.stack_metadata(refs.result)?;
     let op1 = vm.stack_metadata(refs.op1)?;
@@ -338,7 +338,7 @@ fn three_stack_metadata<'a>(
     Ok(ThreeStackMetadata { result, op1, op2 })
 }
 
-fn two_stack_metadata<'a>(vm: &'a Vm, refs: &TwoRefs) -> Result<TwoStackMetadata<'a>, VmError> {
+fn two_stack_metadata<'a>(vm: &'a Vm, refs: &TwoStackRefs) -> Result<TwoStackMetadata<'a>, VmError> {
     let result = vm.stack_metadata(refs.result)?;
     let op = vm.stack_metadata(refs.op)?;
     Ok(TwoStackMetadata { result, op })

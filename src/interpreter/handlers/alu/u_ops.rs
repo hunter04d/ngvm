@@ -1,7 +1,7 @@
 use crate::code::Chunk;
 use crate::interpreter::{run, three_stack_metadata, InterpreterResult};
 use crate::operations::markers::*;
-use crate::refs::refs;
+use crate::refs::refs_size;
 use crate::types::Type;
 use crate::Vm;
 
@@ -47,7 +47,7 @@ where
             ))
         }
     });
-    InterpreterResult::new(1 + refs(3)).with_error_opt(result.err())
+    InterpreterResult::new(1 + refs_size(3)).with_error_opt(result.err())
 }
 
 macro_rules! handle_u_ops {

@@ -1,7 +1,7 @@
 use crate::code::Chunk;
 use crate::error::VmError;
 use crate::interpreter::{run, InterpreterResult};
-use crate::refs::refs;
+use crate::refs::refs_size;
 use crate::stack::data::IntoStackData;
 use crate::types::Type;
 use crate::Vm;
@@ -29,7 +29,7 @@ pub(in crate::interpreter) fn handle_ld_typed0(chunk: &Chunk, vm: &mut Vm) -> In
         vm.push_stack_data_with_type(Default::default(), t);
         Ok(())
     });
-    InterpreterResult::new(1 + refs(1)).with_error_opt(result.err())
+    InterpreterResult::new(1 + refs_size(1)).with_error_opt(result.err())
 }
 pub(in crate::interpreter) fn handle_ld_type(chunk: &Chunk, vm: &mut Vm) -> InterpreterResult {
     let result = run(|| {
@@ -43,7 +43,7 @@ pub(in crate::interpreter) fn handle_ld_type(chunk: &Chunk, vm: &mut Vm) -> Inte
         vm.push_stack_data_with_type(v, t);
         Ok(())
     });
-    InterpreterResult::new(1 + refs(2)).with_error_opt(result.err())
+    InterpreterResult::new(1 + refs_size(2)).with_error_opt(result.err())
 }
 
 pub(in crate::interpreter) fn handle_ld_true(_: &Chunk, vm: &mut Vm) -> InterpreterResult {

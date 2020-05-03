@@ -5,7 +5,7 @@ use std::mem::size_of;
 use Opcode::*;
 
 use crate::opcodes::Opcode as Nc;
-use crate::refs::ThreeRefs;
+use crate::refs::{ThreeStackRefs, PoolRef, StackRef, Ref};
 
 /// Vm opcode represented as Rust enum (size constraints be dammed)
 #[derive(Debug)]
@@ -18,60 +18,60 @@ pub enum Opcode {
 
     /// Load primitive types **empty** value from the constant pool
     LDTyped0 {
-        type_location: usize,
+        type_location: PoolRef,
     },
 
     /// Load type with specific value from constant pool
     LDType {
-        type_location: usize,
-        value_location: usize,
+        type_location: PoolRef,
+        value_location: PoolRef,
     },
     LdUnit,
 
-    UAdd(ThreeRefs),
-    USub(ThreeRefs),
-    UMul(ThreeRefs),
-    UDiv(ThreeRefs),
-    URem(ThreeRefs),
+    UAdd(ThreeStackRefs),
+    USub(ThreeStackRefs),
+    UMul(ThreeStackRefs),
+    UDiv(ThreeStackRefs),
+    URem(ThreeStackRefs),
 
-    IAdd(ThreeRefs),
-    ISub(ThreeRefs),
-    IMul(ThreeRefs),
-    IDiv(ThreeRefs),
-    IRem(ThreeRefs),
-    INeg(ThreeRefs),
+    IAdd(ThreeStackRefs),
+    ISub(ThreeStackRefs),
+    IMul(ThreeStackRefs),
+    IDiv(ThreeStackRefs),
+    IRem(ThreeStackRefs),
+    INeg(ThreeStackRefs),
 
-    FAdd(ThreeRefs),
-    FSub(ThreeRefs),
-    FMul(ThreeRefs),
-    FDiv(ThreeRefs),
-    FRem(ThreeRefs),
-    FNeg(ThreeRefs),
+    FAdd(ThreeStackRefs),
+    FSub(ThreeStackRefs),
+    FMul(ThreeStackRefs),
+    FDiv(ThreeStackRefs),
+    FRem(ThreeStackRefs),
+    FNeg(ThreeStackRefs),
 
     /// Load static string from constant pool
     LdSS {
-        location: usize,
+        location: PoolRef,
     },
 
-    TraceStackValue(usize),
+    TraceStackValue(StackRef),
     /// LOAD value from constant pool as **dynamic** string
     LDDS {
-        location: usize,
+        location: PoolRef,
     },
 }
 
 impl Opcode {
     pub fn to_bytes(&self) -> Vec<u8> {
         match self {
-            U64Ld0 => vec![Nc::U64Ld0.into()],
-            I64Ld0 => vec![Nc::I64Ld0.into()],
-            LDTyped0 { type_location } => with_refs(Nc::LdTyped0, &[*type_location]),
+            U64Ld0 => single(Nc::U64Ld0),
+            I64Ld0 => single(Nc::I64Ld0),
+            LDTyped0 { type_location } => with_one_ref(Nc::LdTyped0, type_location.0),
             LDType {
                 type_location,
                 value_location,
-            } => with_refs(Nc::LdType, &[*type_location, *value_location]),
-            LdSS { location } => with_one_ref(Nc::LdSS, *location),
-            LDDS { location } => with_one_ref(Nc::LdDS, *location),
+            } => with_refs(Nc::LdType, &[type_location.0, value_location.0]),
+            LdSS { location } => with_one_ref(Nc::LdSS, location.0),
+            LDDS { location } => with_one_ref(Nc::LdDS, location.0),
             LdUnit => single(Nc::LdUnit),
             UAdd(v) => with_three_refs(Nc::UAdd, v),
             USub(v) => with_three_refs(Nc::USub, v),
@@ -90,36 +90,36 @@ impl Opcode {
             FDiv(v) => with_three_refs(Nc::FDiv, v),
             FRem(v) => with_three_refs(Nc::FRem, v),
             FNeg(v) => with_three_refs(Nc::FNeg, v),
-            TraceStackValue(v) => with_one_ref(Nc::TraceStackValue, *v),
+            TraceStackValue(v) => with_one_ref(Nc::TraceStackValue, v.0),
         }
     }
 }
 
 fn single(code: Nc) -> Vec<u8> {
-    vec![u8::from(code)]
+    code.bytes()
 }
 
 fn with_refs(code: Nc, refs: &[usize]) -> Vec<u8> {
     let mut res = Vec::with_capacity(1 + refs.len() * size_of::<usize>());
-    res.push(code.into());
+    res.extend_from_slice(&code.bytes());
     for &reference in refs {
         res.extend_from_slice(&reference.to_le_bytes());
     }
     res
 }
 
-fn with_one_ref(code: Nc, r: usize) -> Vec<u8> {
-    let mut res = Vec::with_capacity(1 + size_of::<usize>());
-    res.push(code.into());
+fn with_one_ref(code: Nc, r: Ref) -> Vec<u8> {
+    let mut res = Vec::with_capacity(code.size() + size_of::<usize>());
+    res.extend_from_slice(&code.bytes());
     res.extend_from_slice(&r.to_le_bytes());
     res
 }
 
-fn with_three_refs(code: Nc, refs: &ThreeRefs) -> Vec<u8> {
-    let mut res = Vec::with_capacity(1 + 3 * size_of::<usize>());
-    res.push(code.into());
-    res.extend_from_slice(&refs.result.to_le_bytes());
-    res.extend_from_slice(&refs.op1.to_le_bytes());
-    res.extend_from_slice(&refs.op2.to_le_bytes());
+fn with_three_refs(code: Nc, refs: &ThreeStackRefs) -> Vec<u8> {
+    let mut res = Vec::with_capacity(code.size() + 3 * size_of::<usize>());
+    res.extend_from_slice(&code.bytes());
+    res.extend_from_slice(&refs.result.0.to_le_bytes());
+    res.extend_from_slice(&refs.op1.0.to_le_bytes());
+    res.extend_from_slice(&refs.op2.0.to_le_bytes());
     res
 }

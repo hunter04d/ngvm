@@ -5,7 +5,7 @@ use crate::interpreter::{
 };
 use crate::operations::markers::*;
 use crate::operations::{BiOp, BiOpMarker, UOp, UOpMarker};
-use crate::refs::{refs, ThreeRefs, TwoRefs};
+use crate::refs::{refs_size, ThreeStackRefs, TwoStackRefs};
 use crate::stack::data::{FromSingle, IntoStackData, StackData};
 use crate::types::{HasVmType, Type};
 use crate::Vm;
@@ -39,10 +39,10 @@ where
             ))
         }
     });
-    InterpreterResult::new(1 + refs(3)).with_error_opt(result.err())
+    InterpreterResult::new(1 + refs_size(3)).with_error_opt(result.err())
 }
 
-fn process_bi_op<M, T>(vm: &mut Vm, refs: &ThreeRefs) -> Result<(), VmError>
+fn process_bi_op<M, T>(vm: &mut Vm, refs: &ThreeStackRefs) -> Result<(), VmError>
 where
     M: BiOpMarker,
     T: BiOp<M> + FromSingle<StackData>,
@@ -82,10 +82,10 @@ where
             )),
         }
     });
-    InterpreterResult::new(1 + refs(2)).with_error_opt(result.err())
+    InterpreterResult::new(1 + refs_size(2)).with_error_opt(result.err())
 }
 
-fn process_u_op<M, T>(vm: &mut Vm, refs: &TwoRefs) -> Result<(), VmError>
+fn process_u_op<M, T>(vm: &mut Vm, refs: &TwoStackRefs) -> Result<(), VmError>
 where
     M: UOpMarker,
     T: UOp<M> + FromSingle<StackData>,

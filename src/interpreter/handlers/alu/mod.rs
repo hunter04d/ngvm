@@ -3,7 +3,7 @@ use crate::error::VmError;
 use crate::interpreter::{three_stack_metadata, two_stack_metadata, InterpreterResult};
 use crate::operations::{BiOp, BiOpMarker, UOp, UOpMarker};
 use crate::refs;
-use crate::refs::{ThreeRefs, TwoRefs};
+use crate::refs::{ThreeStackRefs, TwoStackRefs};
 use crate::stack::data::{FromSingle, IntoStackData, StackData};
 use crate::types::{HasVmType, Type};
 use crate::Vm;
@@ -15,7 +15,7 @@ pub mod i_ops;
 pub mod shifts;
 pub mod u_ops;
 
-fn process_fallible_bi_op<M: BiOpMarker, T, O>(vm: &mut Vm, refs: &ThreeRefs) -> Result<(), VmError>
+fn process_fallible_bi_op<M: BiOpMarker, T, O>(vm: &mut Vm, refs: &ThreeStackRefs) -> Result<(), VmError>
 where
     T: FromSingle<StackData> + BiOp<M, O>,
     O: FromSingle<StackData>,
@@ -41,7 +41,7 @@ where
 
 fn process_fallible_u_op<M: UOpMarker, T>(
     vm: &mut Vm,
-    TwoRefs { result, op }: &TwoRefs,
+    TwoStackRefs { result, op }: &TwoStackRefs,
 ) -> Result<(), VmError>
 where
     T: FromSingle<StackData> + UOp<M>,
@@ -75,5 +75,5 @@ pub(in crate::interpreter) fn handle_b_not(chunk: &Chunk, vm: &mut Vm) -> Interp
     let data = *vm.stack_data(meta.op.index).unwrap();
     let res_index = meta.result.index;
     *vm.stack_data_mut(res_index).unwrap() = data.iter().any(|&v| v != 0u8).into_stack_data();
-    InterpreterResult::new(1 + refs::refs(2))
+    InterpreterResult::new(1 + refs::refs_size(2))
 }

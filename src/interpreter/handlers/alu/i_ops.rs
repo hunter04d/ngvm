@@ -2,7 +2,7 @@ use crate::code::Chunk;
 use crate::interpreter::{run, three_stack_metadata, two_stack_metadata, InterpreterResult};
 use crate::operations::markers::*;
 use crate::operations::{BiOp, BiOpMarker, UOp, UOpMarker};
-use crate::refs::refs;
+use crate::refs::refs_size;
 use crate::types::Type;
 use crate::Vm;
 
@@ -46,7 +46,7 @@ where
             ))
         }
     });
-    InterpreterResult::new(1 + refs(3)).with_error_opt(result.err())
+    InterpreterResult::new(1 + refs_size(3)).with_error_opt(result.err())
 }
 
 fn handle_u_signed_op<M: UOpMarker>(chunk: &Chunk, vm: &mut Vm) -> InterpreterResult
@@ -74,7 +74,7 @@ where
             )),
         }
     });
-    InterpreterResult::new(1 + refs(2)).with_error_opt(result.err())
+    InterpreterResult::new(1 + refs_size(2)).with_error_opt(result.err())
 }
 
 macro_rules! handle_i_ops {

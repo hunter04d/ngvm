@@ -136,7 +136,7 @@ impl<T> IndexMut<usize> for HeapArray<T> {
 fn allocate_memory<T>(n: usize) -> Result<NonNull<u8>, AllocErr> {
     let layout = get_layout::<T>(n).unwrap();
     // we ignore the size allocated as it is guarantied to be at least enough to fit n of Ts
-    unsafe { Ok(System.alloc(layout, AllocInit::Zeroed)?.ptr) }
+    Ok(System.alloc(layout, AllocInit::Zeroed)?.ptr)
 }
 
 #[inline]

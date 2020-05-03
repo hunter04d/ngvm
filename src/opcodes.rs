@@ -1,6 +1,6 @@
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
-#[repr(u8)]
+#[repr(u16)]
 #[derive(Debug, Eq, PartialEq, Copy, Clone, IntoPrimitive, TryFromPrimitive)]
 pub enum Opcode {
     U64Ld0 = 0,
@@ -62,58 +62,37 @@ pub enum Opcode {
     Ne = 45,
 
     TraceStackValue = 254,
+    /// Handle wide, not an actually  a valid value for opcode
     HWide = 255,
 }
 
-/// Type of the reference to a value in bytecode
-pub type Ref = usize;
 
-#[cfg(test)]
-mod tests {
-    use std::convert::TryFrom;
-    use std::fmt::{self, Write};
+pub enum OpcodeKind {
+    Single(u8),
+    Double(u8)
+}
 
-    use crate::decoder::handlers::noop as d_noop;
-    use crate::decoder::HANDLERS as D_HANDLERS;
-    use crate::interpreter::handlers::noop as i_noop;
-    use crate::interpreter::HANDLERS as I_HANDLERS;
+impl Opcode {
+    pub fn kind(self) -> OpcodeKind {
+        let num: u16 = self.into();
+        if num < 256 {
+            OpcodeKind::Single(num as u8)
+        } else {
+            OpcodeKind::Double((num - 256) as u8)
+        }
+    }
 
-    use super::*;
+    pub fn bytes(self) -> Vec<u8> {
+        match self.kind() {
+            OpcodeKind::Single(c) => vec![c],
+            OpcodeKind::Double(c) => vec![255, c],
+        }
+    }
 
-    /// Check if all opcodes have handlers and that they don't noop
-    #[test]
-    fn all_opcodes_have_handlers() -> fmt::Result {
-        let mut invalid_decoders = Vec::new();
-        let mut invalid_interpreters = Vec::new();
-        for i in std::u8::MIN..=std::u8::MAX {
-            let op_result = Opcode::try_from(i);
-            if let Ok(op) = op_result {
-                if I_HANDLERS[i as usize] as *const () == i_noop as *const () {
-                    invalid_interpreters.push(op);
-                }
-                if D_HANDLERS[i as usize] as *const () == d_noop as *const () {
-                    invalid_decoders.push(op);
-                }
-            }
+    pub fn size(self) -> usize {
+        match self.kind() {
+            OpcodeKind::Single(_) => 1,
+            OpcodeKind::Double(_) => 2,
         }
-        let mut panic_msg = String::new();
-        if !invalid_interpreters.is_empty() {
-            writeln!(
-                &mut panic_msg,
-                "{:?} opcodes don't have valid **interpret** handlers",
-                invalid_interpreters
-            )?;
-        }
-        if !invalid_decoders.is_empty() {
-            writeln!(
-                &mut panic_msg,
-                "{:?} opcodes don't have valid **decode** handlers",
-                invalid_decoders
-            )?;
-        }
-        if !panic_msg.is_empty() {
-            panic!(panic_msg)
-        }
-        Ok(())
     }
 }

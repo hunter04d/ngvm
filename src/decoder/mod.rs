@@ -1,13 +1,14 @@
-pub(crate) use decode_result::DecodeResult;
+pub(crate) use model::DecodedOpcode;
 use handlers::*;
 
 use crate::code::Chunk;
 
-pub(crate) mod decode_result;
+pub mod model;
 pub mod handlers;
+pub mod tags;
 
 /// All the functions than handle the specific opcode
-pub(crate) static HANDLERS: [fn(&Chunk) -> DecodeResult; 256] = [
+pub(crate) static HANDLERS: [fn(&Chunk) -> Option<DecodedOpcode>; 256] = [
     decode_u64_ld0,           // 0
     decode_i64_ld0,           // 1
     decode_ld_type0,          // 2
