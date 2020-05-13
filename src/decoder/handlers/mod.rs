@@ -1,4 +1,4 @@
-use crate::code::Chunk;
+use crate::code::{Chunk, RefSource};
 use crate::opcodes::Opcode;
 
 use super::DecodedOpcode;
@@ -25,8 +25,8 @@ pub(super) fn decode_ld_type0(chunk: &Chunk) -> Option<DecodedOpcode> {
 }
 
 pub(super) fn decode_ld_type(chunk: &Chunk) -> Option<DecodedOpcode> {
-    let type_ref = chunk.read_ref_pool(0).unwrap();
-    let val_ref = chunk.read_ref_pool(1).unwrap();
+    let type_ref = chunk.read_ref_pool(0)?;
+    let val_ref = chunk.read_ref_pool(1)?;
     let refs = DecoderRefs::Two(
         DecoderRef::pool_with_tag(type_ref, tags::TYPE),
         DecoderRef::pool_with_tag(val_ref, tags::VALUE)

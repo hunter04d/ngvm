@@ -1,14 +1,14 @@
-use crate::code::Chunk;
-use crate::error::VmError;
-use crate::interpreter::{three_stack_metadata, two_stack_metadata, InterpreterResult};
-use crate::operations::{BiOp, BiOpMarker, UOp, UOpMarker};
-use crate::refs;
-use crate::refs::{ThreeStackRefs, TwoStackRefs};
-use crate::stack::data::{FromSingle, IntoStackData, StackData};
-use crate::types::{HasVmType, Type};
-use crate::Vm;
 use std::ops::Try;
 use std::option::NoneError;
+
+use crate::code::Chunk;
+use crate::error::VmError;
+use crate::interpreter::{three_stack_metadata, two_stack_metadata};
+use crate::operations::{BiOp, BiOpMarker, UOp, UOpMarker};
+use crate::refs::{refs_size, ThreeStackRefs, TwoStackRefs};
+use crate::stack::data::{FromSingle, IntoStackData, StackData};
+use crate::types::{HasVmType, Type};
+use crate::vm::{Vm, VmRefSource};
 
 pub mod f_ops;
 pub mod i_ops;
@@ -62,18 +62,18 @@ where
     Ok(())
 }
 
-pub(in crate::interpreter) fn handle_b_not(chunk: &Chunk, vm: &mut Vm) -> InterpreterResult {
-    let refs = chunk.read_two().expect("Ok");
-    let meta = two_stack_metadata(vm, &refs).unwrap();
+pub(in crate::interpreter) fn handle_b_not(chunk: &Chunk, vm: &mut Vm) -> Result<usize, VmError> {
+    let refs = chunk.read_two_vm()?;
+    let meta = two_stack_metadata(vm, &refs)?;
     if meta.result.value_type != Type::Bool {
-        panic!("Types mismatch")
+        return Err(VmError::OutputTypeMismatch);
     }
     if !meta.op.value_type.is_primitive() {
-        panic!("Invalid operation")
+        return Err(VmError::UOpError);
     }
 
-    let data = *vm.stack_data(meta.op.index).unwrap();
+    let data = *vm.stack_data(meta.op.index)?;
     let res_index = meta.result.index;
-    *vm.stack_data_mut(res_index).unwrap() = data.iter().any(|&v| v != 0u8).into_stack_data();
-    InterpreterResult::new(1 + refs::refs_size(2))
+    *vm.stack_data_mut(res_index)? = data.iter().any(|&v| v != 0u8).into_stack_data();
+    Ok(1 + refs_size(2))
 }

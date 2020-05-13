@@ -42,7 +42,6 @@ pub enum Opcode {
     BNot = 29,
     BBe = 30,
     BXor = 31,
-    // Todo: Logical ops
     LAnd = 32,
     LOr = 33,
     LNot = 34,
@@ -60,7 +59,20 @@ pub enum Opcode {
     Lt = 43,
     Eq = 44,
     Ne = 45,
+    // TODO: jump
+    /// Jump <offset>
+    J = 46,
+    /// Jump <condition> <offset>
+    JC = 47,
+    StartScope = 48,
+    EndScope = 49,
+    // TODO: call
+    Call = 50, // Call <POOL REF>
+    Ret = 51, // Return
+    IsType = 52,
+    // TODO: arrays if have time
 
+    //
     TraceStackValue = 254,
     /// Handle wide, not an actually  a valid value for opcode
     HWide = 255,

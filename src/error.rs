@@ -15,9 +15,9 @@ pub enum VmError {
     OperandsTypeMismatch(Opcode, Type, Type),
     #[error("Output types mismatch")]
     OutputTypeMismatch,
-    #[error("Error while processing a binary operation <RECOVERABLE>")]
+    #[error("Error while processing a binary operation")]
     BiOpError,
-    #[error("Error while processing a unary operation <RECOVERABLE>")]
+    #[error("Error while processing a unary operation")]
     UOpError,
     #[error("Constant pool constrains invalid value")]
     ConstantPoolError,

@@ -10,7 +10,7 @@ pub struct StackMetadata {
 
 impl StackMetadata {
     pub fn new(value_type: Type, index: StackRef) -> Self {
-        StackMetadata { value_type, index }
+        Self { value_type, index }
     }
 
     pub fn is_single(&self) -> bool {

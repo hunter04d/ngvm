@@ -1,18 +1,17 @@
 use crate::code::Chunk;
-use crate::interpreter::{run, three_stack_metadata, InterpreterResult};
+use crate::interpreter::{three_stack_metadata};
 use crate::operations::markers::*;
 use crate::refs::refs_size;
 use crate::types::Type;
-use crate::Vm;
 
 use super::process_fallible_bi_op;
-use crate::error::VmError;
-use crate::error::VmError::InvalidBytecode;
 use crate::operations::{BiOp, BiOpMarker};
 use std::ops::Try;
 use std::option::NoneError;
+use crate::vm::{Vm, VmRefSource};
+use crate::error::VmError;
 
-fn handle_bi_unsigned_op<M: BiOpMarker>(chunk: &Chunk, vm: &mut Vm) -> InterpreterResult
+fn handle_bi_unsigned_op<M: BiOpMarker>(chunk: &Chunk, vm: &mut Vm) -> Result<usize, VmError>
 where
     u64: BiOp<M>,
     u32: BiOp<M>,
@@ -23,37 +22,35 @@ where
     <u16 as BiOp<M>>::Output: Try<Ok = u16, Error = NoneError>,
     <u8 as BiOp<M>>::Output: Try<Ok = u8, Error = NoneError>,
 {
-    let result = run(|| {
-        let rf = &chunk.read_three().ok_or(InvalidBytecode)?;
+    let rf = &chunk.read_three_vm()?;
 
-        let meta = three_stack_metadata(vm, rf)?;
+    let meta = three_stack_metadata(vm, rf)?;
 
-        if meta.op1.value_type == meta.op2.value_type {
-            match meta.op1.value_type {
-                Type::U64 => process_fallible_bi_op::<M, u64, u64>(vm, rf),
-                Type::U32 => process_fallible_bi_op::<M, u32, u32>(vm, rf),
-                Type::U16 => process_fallible_bi_op::<M, u16, u16>(vm, rf),
-                Type::U8 => process_fallible_bi_op::<M, u8, u8>(vm, rf),
-                _ => Err(VmError::InvalidTypeForOperation(
-                    chunk.opcode(),
-                    meta.op1.value_type,
-                )),
-            }
-        } else {
-            Err(VmError::OperandsTypeMismatch(
-                chunk.opcode(),
+    if meta.op1.value_type == meta.op2.value_type {
+        match meta.op1.value_type {
+            Type::U64 => process_fallible_bi_op::<M, u64, u64>(vm, rf),
+            Type::U32 => process_fallible_bi_op::<M, u32, u32>(vm, rf),
+            Type::U16 => process_fallible_bi_op::<M, u16, u16>(vm, rf),
+            Type::U8 => process_fallible_bi_op::<M, u8, u8>(vm, rf),
+            _ => Err(VmError::InvalidTypeForOperation(
+                chunk.single_opcode(),
                 meta.op1.value_type,
-                meta.op2.value_type,
-            ))
+            )),
         }
-    });
-    InterpreterResult::new(1 + refs_size(3)).with_error_opt(result.err())
+    } else {
+        Err(VmError::OperandsTypeMismatch(
+            chunk.single_opcode(),
+            meta.op1.value_type,
+            meta.op2.value_type,
+        ))
+    }?;
+    Ok(1 + refs_size(3))
 }
 
 macro_rules! handle_u_ops {
    ($($fn_name: ident => $marker: ty),*) => {
         $(
-        pub(in crate::interpreter) fn $fn_name(chunk: &Chunk, vm: &mut Vm) -> InterpreterResult {
+        pub(in crate::interpreter) fn $fn_name(chunk: &Chunk, vm: &mut Vm) -> Result<usize, VmError> {
             handle_bi_unsigned_op::<$marker>(chunk, vm)
         })*
 
