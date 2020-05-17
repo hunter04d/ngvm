@@ -1,4 +1,4 @@
-use handlers::{*, alu::f_ops::*, alu::i_ops::*, alu::shifts::*, alu::u_ops::*, load::*};
+use handlers::{alu::f_ops::*, alu::i_ops::*, alu::shifts::*, alu::u_ops::*, load::*, *};
 
 use crate::code::Chunk;
 use crate::error::VmError;
@@ -270,9 +270,8 @@ pub(crate) static HANDLERS: [IntHandler; 256] = [
     noop,                     // 252
     noop,                     // 253
     handle_trace_stack_value, // 254
-    handle_wide, // 255  Handle two-byte instruction
+    handle_wide,              // 255  Handle two-byte instruction
 ];
-
 
 struct ThreeStackMetadata<'a> {
     result: &'a StackMetadata,
@@ -295,7 +294,10 @@ fn three_stack_metadata<'a>(
     Ok(ThreeStackMetadata { result, op1, op2 })
 }
 
-fn two_stack_metadata<'a>(vm: &'a Vm, refs: &TwoStackRefs) -> Result<TwoStackMetadata<'a>, VmError> {
+fn two_stack_metadata<'a>(
+    vm: &'a Vm,
+    refs: &TwoStackRefs,
+) -> Result<TwoStackMetadata<'a>, VmError> {
     let result = vm.stack_metadata(refs.result)?;
     let op = vm.stack_metadata(refs.op)?;
     Ok(TwoStackMetadata { result, op })

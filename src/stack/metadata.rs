@@ -1,5 +1,5 @@
-use crate::types::Type;
 use crate::refs::StackRef;
+use crate::types::Type;
 
 #[derive(Debug)]
 pub struct StackMetadata {

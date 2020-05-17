@@ -1,9 +1,7 @@
-use std::convert::{TryFrom, TryInto};
-use std::mem::size_of;
+use std::convert::{TryFrom};
 
 use crate::code::RefSource;
 use crate::opcodes::Opcode;
-use crate::refs::Ref;
 
 use super::Code;
 
@@ -58,11 +56,12 @@ impl<'a> From<&'a Code> for Chunk<'a> {
 }
 
 impl<'a> RefSource for Chunk<'a> {
-    fn read_ref_from_offset(&self, offset: usize) -> Option<Ref> {
-        const S: usize = size_of::<Ref>();
-        // full offset to read the Ref from
+    fn read_from_offset(&self, offset: usize, size: usize) -> Option<&[u8]> {
         let offset = self.offset + offset;
-        let bytes: [u8; S] = self.bytes[offset..offset + S].try_into().ok()?;
-        Some(Ref::from_le_bytes(bytes))
+        if offset + size < self.bytes.len() {
+            Some(&self.bytes[offset..offset + size])
+        } else {
+            None
+        }
     }
 }

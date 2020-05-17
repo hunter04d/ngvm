@@ -9,6 +9,7 @@ pub use constant::{Constant, ConstantPool};
 pub use vm::Vm;
 
 pub mod decoder;
+pub mod error;
 pub mod interpreter;
 pub mod model;
 pub mod opcodes;
@@ -16,7 +17,6 @@ pub mod operations;
 pub mod primitives;
 pub mod refs;
 pub mod types;
-pub mod error;
 
 mod code;
 mod constant;

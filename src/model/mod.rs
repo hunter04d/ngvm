@@ -5,7 +5,7 @@ use std::mem::size_of;
 use Opcode::*;
 
 use crate::opcodes::Opcode as Nc;
-use crate::refs::{ThreeStackRefs, PoolRef, StackRef, Ref, TwoStackRefs};
+use crate::refs::{PoolRef, Ref, StackRef, ThreeStackRefs, TwoStackRefs};
 
 /// Vm opcode represented as Rust enum (size constraints be dammed)
 #[derive(Debug)]
@@ -113,17 +113,17 @@ impl Opcode {
             LdFalse => single(Nc::LdFalse),
             BAnd(v) => with_three_refs(Nc::BAnd, v),
             BOr(v) => with_three_refs(Nc::BOr, v),
-            BNot(v) =>  with_two_refs(Nc::BNot, v),
-            BBe(v) => with_two_refs(Nc::BBe,  v),
+            BNot(v) => with_two_refs(Nc::BNot, v),
+            BBe(v) => with_two_refs(Nc::BBe, v),
             BXor(v) => with_three_refs(Nc::BXor, v),
-            LAnd(v) => with_three_refs(Nc::LAnd,v),
-            LOr(v) => with_three_refs(Nc::LOr,v),
-            LNot(v) => with_three_refs(Nc::LNot,v),
-            LXor(v) => with_three_refs(Nc::LXor,v),
-            Shl(v) => with_three_refs(Nc::Shl,v),
-            Shr(v) => with_three_refs(Nc::Shr,v),
-            RotL(v) => with_three_refs(Nc::RotL,v),
-            RotR(v) => with_three_refs(Nc::RotR,v),
+            LAnd(v) => with_three_refs(Nc::LAnd, v),
+            LOr(v) => with_three_refs(Nc::LOr, v),
+            LNot(v) => with_three_refs(Nc::LNot, v),
+            LXor(v) => with_three_refs(Nc::LXor, v),
+            Shl(v) => with_three_refs(Nc::Shl, v),
+            Shr(v) => with_three_refs(Nc::Shr, v),
+            RotL(v) => with_three_refs(Nc::RotL, v),
+            RotR(v) => with_three_refs(Nc::RotR, v),
             TraceStackValue(v) => with_one_ref(Nc::TraceStackValue, v.0),
         }
     }

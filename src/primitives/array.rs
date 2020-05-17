@@ -1,4 +1,4 @@
-use std::alloc::{AllocErr, AllocRef, Layout, LayoutErr, System, AllocInit};
+use std::alloc::{AllocErr, AllocInit, AllocRef, Layout, LayoutErr, System};
 use std::fmt::{self, Debug, Formatter};
 use std::marker::PhantomData;
 use std::ops::{Index, IndexMut};

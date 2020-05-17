@@ -1,18 +1,15 @@
 use std::mem::size_of;
 
-use crate::decoder::{HANDLERS as D_HANDLERS, DecodedOpcode};
+use crate::decoder::{DecodedOpcode, HANDLERS as D_HANDLERS};
 use crate::interpreter::HANDLERS as I_HANDLERS;
 use crate::model;
-use crate::refs::{
-    PoolRef,
-    Ref,
-    StackRef, ThreeStackRefs,
-    TwoStackRefs};
+use crate::refs::{PoolRef, Ref, StackRef, ThreeStackRefs, TwoStackRefs};
 use crate::Vm;
 
 mod chunk;
 
 pub use chunk::Chunk;
+use std::convert::TryInto;
 
 /// Byte-code of this machine
 /// A wrapper around the raw bytes
@@ -76,13 +73,13 @@ impl Code {
             let op_fn = D_HANDLERS[chunk.read_byte() as usize];
             let res_opt = op_fn(&chunk);
             match res_opt {
-                None =>  {
+                None => {
                     return DecodeResult {
                         opcodes,
                         size: chunk.offset,
                         is_full: false,
                     };
-                },
+                }
                 Some(res) => {
                     chunk.advance(res.consumed);
                     opcodes.push(res);
@@ -92,19 +89,44 @@ impl Code {
         DecodeResult {
             opcodes,
             size: chunk.offset,
-            is_full: true
+            is_full: true,
         }
     }
 }
 
 pub trait RefSource {
-    fn read_ref_from_offset(&self, offset: usize) -> Option<Ref>;
+    fn read_from_offset(&self, offset: usize, size: usize) -> Option<&[u8]>;
     /// Reads a `Ref` from bytecode
     ///
     /// `index` is the index of the ref in the bytecode
     #[inline]
     fn read_ref(&self, index: usize) -> Option<Ref> {
-        self.read_ref_from_offset(1 + index * size_of::<Ref>())
+        let bytes = self.read_from_offset(1 + index * size_of::<Ref>(), size_of::<Ref>())?;
+        const S: usize = size_of::<Ref>();
+        let bytes: [u8; S] = bytes.try_into().ok()?;
+        Some(Ref::from_le_bytes(bytes))
+    }
+
+    #[inline]
+    fn read_ref_with_offset(&self, index: usize) -> Option<Ref> {
+        let bytes = self.read_from_offset(
+            1 + size_of::<usize>() + index * size_of::<Ref>(),
+            size_of::<Ref>(),
+        )?;
+        const S: usize = size_of::<Ref>();
+        let bytes: [u8; S] = bytes.try_into().ok()?;
+        Some(Ref::from_le_bytes(bytes))
+    }
+
+    #[inline]
+    fn read_offset(&self) -> Option<usize> {
+        let bytes = self.read_from_offset(
+            1,
+            size_of::<usize>(),
+        )?;
+        const S: usize = size_of::<usize>();
+        let bytes: [u8; S] = bytes.try_into().ok()?;
+        Some(usize::from_le_bytes(bytes))
     }
 
     fn read_two(&self) -> Option<TwoStackRefs> {
@@ -131,7 +153,6 @@ pub trait RefSource {
     }
 }
 
-
 impl DecodeResult {
     pub fn print(&self, print_bytes: bool) {
         let mut offset = 0usize;
@@ -140,8 +161,19 @@ impl DecodeResult {
             if print_bytes {
                 let mut bytes = op.op_code.bytes();
                 bytes.extend_from_slice(&op.refs.bytes());
-                let bytes = bytes.into_iter().map(|v| format!("{:02x}", v)).collect::<Vec<_>>().join("");
-                println!("{:<w$} 0x{:<64} {:?} {}", offset, bytes, op.op_code, op.refs, w = w);
+                let bytes = bytes
+                    .into_iter()
+                    .map(|v| format!("{:02x}", v))
+                    .collect::<Vec<_>>()
+                    .join("");
+                println!(
+                    "{:<w$} 0x{:<64} {:?} {}",
+                    offset,
+                    bytes,
+                    op.op_code,
+                    op.refs,
+                    w = w
+                );
             } else {
                 println!("{:<w$} {:?} {}", offset, op.op_code, op.refs, w = w);
             }
@@ -149,4 +181,3 @@ impl DecodeResult {
         }
     }
 }
-

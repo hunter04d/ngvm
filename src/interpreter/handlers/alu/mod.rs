@@ -15,7 +15,10 @@ pub mod i_ops;
 pub mod shifts;
 pub mod u_ops;
 
-fn process_fallible_bi_op<M: BiOpMarker, T, O>(vm: &mut Vm, refs: &ThreeStackRefs) -> Result<(), VmError>
+fn process_fallible_bi_op<M: BiOpMarker, T, O>(
+    vm: &mut Vm,
+    refs: &ThreeStackRefs,
+) -> Result<(), VmError>
 where
     T: FromSingle<StackData> + BiOp<M, O>,
     O: FromSingle<StackData>,

@@ -1,8 +1,8 @@
 use crate::code::{Chunk, RefSource};
 use crate::error::VmError;
 use crate::interpreter::{three_stack_metadata, two_stack_metadata, TwoStackMetadata};
-use crate::operations::{BiOp, BiOpMarker, UOp, UOpMarker};
 use crate::operations::markers::*;
+use crate::operations::{BiOp, BiOpMarker, UOp, UOpMarker};
 use crate::refs::{refs_size, ThreeStackRefs, TwoStackRefs};
 use crate::stack::data::{FromSingle, IntoStackData, StackData};
 use crate::types::{HasVmType, Type};
@@ -23,10 +23,12 @@ where
         match meta.op1.value_type {
             Type::F64 => process_bi_op::<M, f64>(vm, rf)?,
             Type::F32 => process_bi_op::<M, f32>(vm, rf)?,
-            _ => return Err(VmError::InvalidTypeForOperation(
-                chunk.single_opcode(),
-                meta.op1.value_type,
-            )),
+            _ => {
+                return Err(VmError::InvalidTypeForOperation(
+                    chunk.single_opcode(),
+                    meta.op1.value_type,
+                ))
+            }
         }
     } else {
         return Err(VmError::OperandsTypeMismatch(
@@ -35,7 +37,7 @@ where
             meta.op2.value_type,
         ));
     }
-   Ok(1 + refs_size(3))
+    Ok(1 + refs_size(3))
 }
 
 fn process_bi_op<M, T>(vm: &mut Vm, refs: &ThreeStackRefs) -> Result<(), VmError>

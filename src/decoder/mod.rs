@@ -1,10 +1,10 @@
-pub(crate) use model::DecodedOpcode;
 use handlers::*;
+pub(crate) use model::DecodedOpcode;
 
 use crate::code::Chunk;
 
-pub mod model;
 pub mod handlers;
+pub mod model;
 pub mod tags;
 
 /// All the functions than handle the specific opcode
@@ -36,27 +36,27 @@ pub(crate) static HANDLERS: [fn(&Chunk) -> Option<DecodedOpcode>; 256] = [
     decode_f_div,             // 24
     decode_f_rem,             // 25
     decode_f_neg,             // 26
-    noop,                     // 27
-    noop,                     // 28
-    noop,                     // 29
-    noop,                     // 30
-    noop,                     // 31
-    noop,                     // 32
-    noop,                     // 33
-    noop,                     // 34
-    noop,                     // 35
-    noop,                     // 36
-    noop,                     // 37
-    noop,                     // 38
-    noop,                     // 39
-    noop,                     // 40
-    noop,                     // 41
-    noop,                     // 42
-    noop,                     // 43
-    noop,                     // 44
-    noop,                     // 45
-    noop,                     // 46
-    noop,                     // 47
+    decode_b_and,             // 27
+    decode_b_or,              // 28
+    decode_b_not,             // 29
+    decode_b_be,              // 30
+    decode_b_xor,             // 31
+    decode_l_and,             // 32
+    decode_l_or,              // 33
+    decode_l_not,             // 34
+    decode_l_xor,             // 35
+    decode_shl,               // 36
+    decode_shr,               // 37
+    decode_rotl,              // 38
+    decode_rotr,              // 39
+    decode_ge,                // 40
+    decode_gt,                // 41
+    decode_le,                // 42
+    decode_lt,                // 43
+    decode_eq,                // 44
+    decode_ne,                // 45
+    decode_j,                 // 46
+    decode_jc,                // 47
     noop,                     // 48
     noop,                     // 49
     noop,                     // 50

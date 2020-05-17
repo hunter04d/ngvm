@@ -1,12 +1,11 @@
 use std::collections::HashMap;
-use std::mem::size_of;
 
-use crate::{ConstantPool, Module};
-use crate::code::{RefSource, Chunk};
+use crate::code::{Chunk, RefSource};
 use crate::error::VmError;
 use crate::refs::{PoolRef, Ref, StackRef, ThreeStackRefs, TwoStackRefs};
 use crate::stack::{data::StackData, metadata::StackMetadata};
 use crate::types::Type;
+use crate::{ConstantPool, Module};
 
 pub struct Vm {
     /// vm stack values
@@ -24,7 +23,7 @@ pub struct Vm {
     /// Loaded modules
     pub(crate) modules: HashMap<String, Module>,
 
-    pub(crate) current_module: String
+    pub(crate) current_module: String,
 }
 
 impl Vm {
@@ -96,15 +95,16 @@ impl Vm {
     }
 }
 
-
 pub trait VmRefSource {
     type VmError: std::error::Error;
 
-    fn read_ref_from_offset_vm(&self, index: usize) -> Result<Ref, Self::VmError>;
+    fn read_from_offset_vm(&self, offset: usize, size: usize) -> Result<&[u8], Self::VmError>;
 
-    fn read_ref_vm(&self, index: usize) -> Result<Ref, Self::VmError> {
-        self.read_ref_from_offset_vm(1 + index * size_of::<Ref>())
-    }
+    fn read_ref_vm(&self, index: usize) -> Result<Ref, Self::VmError>;
+
+    fn read_ref_with_offset_vm(&self, index: usize) -> Result<Ref, Self::VmError>;
+
+    fn read_offset_vm(&self) -> Result<usize, Self::VmError>;
 
     fn read_two_vm(&self) -> Result<TwoStackRefs, Self::VmError> {
         let result = StackRef(self.read_ref_vm(0)?);
@@ -131,7 +131,19 @@ pub trait VmRefSource {
 impl VmRefSource for Chunk<'_> {
     type VmError = VmError;
 
-    fn read_ref_from_offset_vm(&self, index: usize) -> Result<usize, Self::VmError> {
-        self.read_ref_from_offset(index).ok_or(VmError::InvalidBytecode)
+    fn read_from_offset_vm(&self, offset: usize, size: usize) -> Result<&[u8], Self::VmError> {
+        self.read_from_offset(offset, size).ok_or(VmError::InvalidBytecode)
+    }
+
+    fn read_ref_vm(&self, index: usize) -> Result<Ref, Self::VmError> {
+        self.read_ref(index).ok_or(VmError::InvalidBytecode)
+    }
+
+    fn read_ref_with_offset_vm(&self, index: usize) -> Result<Ref, Self::VmError> {
+        self.read_ref_with_offset(index).ok_or(VmError::InvalidBytecode)
+    }
+
+    fn read_offset_vm(&self) -> Result<usize, Self::VmError> {
+        self.read_offset().ok_or(VmError::InvalidBytecode)
     }
 }

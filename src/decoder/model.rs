@@ -1,7 +1,7 @@
-use crate::refs::{refs_size, VmRef, PoolRef, StackRef};
-use std::fmt::{self, Display, Formatter};
 use crate::opcodes::Opcode;
+use crate::refs::{refs_size, VmRef};
 use std::borrow::Cow;
+use std::fmt::{self, Display, Formatter};
 
 /// The result of the decoding the input stream
 pub struct DecodedOpcode {
@@ -24,25 +24,24 @@ pub struct DecoderRef {
 }
 
 impl DecoderRef {
-    pub fn pool(pool_ref: PoolRef) -> Self {
-        Self { tag: None, vm_ref: pool_ref.into() }
-    }
-
-    pub fn stack(stack_ref: StackRef) -> Self {
-        Self { tag: None, vm_ref: stack_ref.into() }
-    }
-
-    pub fn pool_with_tag(pool_ref: PoolRef, tag: impl Into<Cow<'static, str>>) -> Self {
+    pub fn new_with_no_tag(vm_ref: impl Into<VmRef>) -> Self {
         Self {
-            tag: Some(tag.into()),
-            vm_ref: pool_ref.into(),
+            tag: None,
+            vm_ref: vm_ref.into(),
         }
     }
 
-    pub fn stack_with_tag(stack_ref: StackRef, tag: impl Into<Cow<'static, str>>) -> Self {
+    pub fn new(vm_ref: impl Into<VmRef>, tag: impl Into<Cow<'static, str>>) -> Self {
         Self {
             tag: Some(tag.into()),
-            vm_ref: stack_ref.into(),
+            vm_ref: vm_ref.into(),
+        }
+    }
+
+    pub fn offset(r: usize, tag: impl Into<Cow<'static, str>>) -> Self {
+        Self {
+            tag: Some(tag.into()),
+            vm_ref: VmRef::Offset(r)
         }
     }
 }
@@ -52,6 +51,7 @@ impl Display for DecoderRef {
         let (symbol, value) = match self.vm_ref {
             VmRef::Stack(r) => ("@", r.0),
             VmRef::Pool(r) => ("$", r.0),
+            VmRef::Offset(r) => ("*", r),
         };
         f.write_str(symbol)?;
         if let Some(tag) = &self.tag {
@@ -80,21 +80,22 @@ impl DecoderRefs {
     }
 
     pub fn bytes(&self) -> Vec<u8> {
+        // TODO: possible optimization with the allocated size
         let mut res = Vec::new();
         match self {
-            DecoderRefs::Zero => {},
+            DecoderRefs::Zero => {}
             DecoderRefs::One(r) => {
-                res.extend_from_slice(&r.vm_ref.value().to_le_bytes());
-            },
-            DecoderRefs::Two(r1, r2 ) => {
-                res.extend_from_slice(&r1.vm_ref.value().to_le_bytes());
-                res.extend_from_slice(&r2.vm_ref.value().to_le_bytes());
-            },
+                res.extend(r.vm_ref.to_bytes());
+            }
+            DecoderRefs::Two(r1, r2) => {
+                res.extend(r1.vm_ref.to_bytes());
+                res.extend(r2.vm_ref.to_bytes());
+            }
             DecoderRefs::Three(r1, r2, r3) => {
-                res.extend_from_slice(&r1.vm_ref.value().to_le_bytes());
-                res.extend_from_slice(&r2.vm_ref.value().to_le_bytes());
-                res.extend_from_slice(&r3.vm_ref.value().to_le_bytes());
-            },
+                res.extend(r1.vm_ref.to_bytes());
+                res.extend(r2.vm_ref.to_bytes());
+                res.extend(r3.vm_ref.to_bytes());
+            }
         }
         res
     }
@@ -103,31 +104,29 @@ impl DecoderRefs {
 impl Display for DecoderRefs {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            DecoderRefs::Zero =>
-                Ok(()),
-            DecoderRefs::One(r) =>
-                write!(f, "{}", r),
-            DecoderRefs::Two(r1, r2) =>
-                write!(f, "{} {}", r1, r2),
-            DecoderRefs::Three(r1, r2, r3) =>
-                write!(f, "{} {} {}", r1, r2, r3),
+            DecoderRefs::Zero => Ok(()),
+            DecoderRefs::One(r) => write!(f, "{}", r),
+            DecoderRefs::Two(r1, r2) => write!(f, "{} {}", r1, r2),
+            DecoderRefs::Three(r1, r2, r3) => write!(f, "{} {} {}", r1, r2, r3),
         }
     }
 }
 
 impl DecodedOpcode {
-    #[allow(dead_code)]
-    pub(crate) fn new(consumed: usize, op_code: Opcode, refs: DecoderRefs) -> Self {
-        Self { consumed, op_code, refs }
+    pub(crate) fn new(op_code: Opcode, refs: DecoderRefs) -> Self {
+        Self {
+            consumed: op_code.size() + refs_size(refs.count()),
+            op_code,
+            refs,
+        }
     }
 
     #[allow(dead_code)]
-    pub(crate) fn single(op_code: Opcode, refs: DecoderRefs) -> Self {
-        Self { consumed: 1 + refs_size(refs.count()), op_code, refs }
-    }
-
-    #[allow(dead_code)]
-    pub(crate) fn double(op_code: Opcode, refs: DecoderRefs) -> Self {
-        Self { consumed: 2 + refs_size(refs.count()), op_code, refs }
+    pub(crate) fn zero(op_code: Opcode) -> Self {
+        Self {
+            consumed: op_code.size(),
+            op_code,
+            refs: DecoderRefs::Zero,
+        }
     }
 }

@@ -68,7 +68,7 @@ pub enum Opcode {
     EndScope = 49,
     // TODO: call
     Call = 50, // Call <POOL REF>
-    Ret = 51, // Return
+    Ret = 51,  // Return
     IsType = 52,
     // TODO: arrays if have time
 
@@ -78,10 +78,9 @@ pub enum Opcode {
     HWide = 255,
 }
 
-
 pub enum OpcodeKind {
     Single(u8),
-    Double(u8)
+    Double(u8),
 }
 
 impl Opcode {

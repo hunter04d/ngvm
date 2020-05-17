@@ -1,15 +1,15 @@
 use crate::code::Chunk;
-use crate::interpreter::{three_stack_metadata};
+use crate::interpreter::three_stack_metadata;
 use crate::operations::markers::*;
 use crate::refs::refs_size;
 use crate::types::Type;
 
 use super::process_fallible_bi_op;
+use crate::error::VmError;
 use crate::operations::{BiOp, BiOpMarker};
+use crate::vm::{Vm, VmRefSource};
 use std::ops::Try;
 use std::option::NoneError;
-use crate::vm::{Vm, VmRefSource};
-use crate::error::VmError;
 
 fn handle_bi_unsigned_op<M: BiOpMarker>(chunk: &Chunk, vm: &mut Vm) -> Result<usize, VmError>
 where

@@ -2,14 +2,14 @@ use std::ops::Try;
 use std::option::NoneError;
 
 use crate::code::Chunk;
+use crate::error::VmError;
 use crate::interpreter::handlers::alu::process_fallible_bi_op;
-use crate::interpreter::{three_stack_metadata};
+use crate::interpreter::three_stack_metadata;
 use crate::operations::markers::*;
 use crate::operations::{BiOp, BiOpMarker};
 use crate::refs::refs_size;
 use crate::types::Type;
 use crate::vm::{Vm, VmRefSource};
-use crate::error::VmError;
 
 fn handle_shift_op<M: BiOpMarker>(chunk: &Chunk, vm: &mut Vm) -> Result<usize, VmError>
 where
@@ -44,7 +44,10 @@ where
             Type::I32 => process_fallible_bi_op::<M, i32, u32>(vm, rf),
             Type::I16 => process_fallible_bi_op::<M, i16, u32>(vm, rf),
             Type::I8 => process_fallible_bi_op::<M, i8, u32>(vm, rf),
-            _ => Err(VmError::InvalidTypeForOperation(chunk.single_opcode(), meta.op1.value_type)),
+            _ => Err(VmError::InvalidTypeForOperation(
+                chunk.single_opcode(),
+                meta.op1.value_type,
+            )),
         }
     } else {
         Err(VmError::OperandsTypeMismatch(

@@ -26,13 +26,23 @@ impl From<Ref> for PoolRef {
 pub enum VmRef {
     Stack(StackRef),
     Pool(PoolRef),
+    Offset(usize),
 }
 
 impl VmRef {
-    pub fn value(self) -> Ref {
+    pub fn ref_value(self) -> Option<Ref> {
         match self {
-            VmRef::Stack(r) => r.0,
-            VmRef::Pool(r) => r.0,
+            VmRef::Stack(r) => Some(r.0),
+            VmRef::Pool(r) => Some(r.0),
+            VmRef::Offset(_) => None,
+        }
+    }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        match self {
+            VmRef::Stack(r) => Vec::from(r.0.to_le_bytes()),
+            VmRef::Pool(r) => Vec::from(r.0.to_le_bytes()),
+            VmRef::Offset(r) =>Vec::from(r.to_le_bytes()),
         }
     }
 }
@@ -68,7 +78,7 @@ pub const fn three(result: usize, op1: usize, op2: usize) -> ThreeStackRefs {
     ThreeStackRefs {
         result: StackRef(result),
         op1: StackRef(op1),
-        op2: StackRef(op2)
+        op2: StackRef(op2),
     }
 }
 
@@ -76,7 +86,7 @@ pub const fn three(result: usize, op1: usize, op2: usize) -> ThreeStackRefs {
 pub const fn two(result: usize, op: usize) -> TwoStackRefs {
     TwoStackRefs {
         result: StackRef(result),
-        op: StackRef(op)
+        op: StackRef(op),
     }
 }
 /// 1 reference opcode constructor
