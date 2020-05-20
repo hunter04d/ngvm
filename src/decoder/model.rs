@@ -41,7 +41,7 @@ impl DecoderRef {
     pub fn offset(r: usize, tag: impl Into<Cow<'static, str>>) -> Self {
         Self {
             tag: Some(tag.into()),
-            vm_ref: VmRef::Offset(r)
+            vm_ref: VmRef::Offset(r),
         }
     }
 }

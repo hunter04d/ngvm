@@ -1,7 +1,5 @@
-use std::convert::{TryFrom};
-
 use crate::code::RefSource;
-use crate::opcodes::Opcode;
+use crate::opcodes::{Opcode, OpcodeKind};
 
 use super::Code;
 
@@ -40,8 +38,15 @@ impl<'a> Chunk<'a> {
         self.bytes[self.offset]
     }
 
+    const ERROR_INVALID_OPCODE: &'static str = "FATAL ERROR: Invalid opcode";
+
     pub(crate) fn single_opcode(&self) -> Opcode {
-        Opcode::try_from(self.bytes[self.offset] as u16).expect("Invalid opcode")
+        Opcode::single(self.read_byte()).expect(Self::ERROR_INVALID_OPCODE)
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn opcode(&self, kind: OpcodeKind) -> Opcode {
+        Opcode::from_kind(self.read_byte(), kind).expect(Self::ERROR_INVALID_OPCODE)
     }
 
     pub fn offset(&self) -> usize {

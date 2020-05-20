@@ -1,11 +1,11 @@
 use crate::code::Chunk;
-use crate::interpreter::three_stack_metadata;
 use crate::operations::markers::*;
 use crate::refs::refs_size;
 use crate::types::Type;
 
 use super::process_fallible_bi_op;
 use crate::error::VmError;
+use crate::interpreter::handlers::alu::AluExtensions;
 use crate::operations::{BiOp, BiOpMarker};
 use crate::vm::{Vm, VmRefSource};
 use std::ops::Try;
@@ -22,16 +22,17 @@ where
     <u16 as BiOp<M>>::Output: Try<Ok = u16, Error = NoneError>,
     <u8 as BiOp<M>>::Output: Try<Ok = u8, Error = NoneError>,
 {
+    let code = chunk.single_opcode();
     let rf = &chunk.read_three_vm()?;
 
-    let meta = three_stack_metadata(vm, rf)?;
+    let meta = vm.three_stack_metadata(rf)?;
 
     if meta.op1.value_type == meta.op2.value_type {
         match meta.op1.value_type {
-            Type::U64 => process_fallible_bi_op::<M, u64, u64>(vm, rf),
-            Type::U32 => process_fallible_bi_op::<M, u32, u32>(vm, rf),
-            Type::U16 => process_fallible_bi_op::<M, u16, u16>(vm, rf),
-            Type::U8 => process_fallible_bi_op::<M, u8, u8>(vm, rf),
+            Type::U64 => process_fallible_bi_op::<M, u64, u64>(vm, rf, code),
+            Type::U32 => process_fallible_bi_op::<M, u32, u32>(vm, rf, code),
+            Type::U16 => process_fallible_bi_op::<M, u16, u16>(vm, rf, code),
+            Type::U8 => process_fallible_bi_op::<M, u8, u8>(vm, rf, code),
             _ => Err(VmError::InvalidTypeForOperation(
                 chunk.single_opcode(),
                 meta.op1.value_type,

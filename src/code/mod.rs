@@ -120,10 +120,7 @@ pub trait RefSource {
 
     #[inline]
     fn read_offset(&self) -> Option<usize> {
-        let bytes = self.read_from_offset(
-            1,
-            size_of::<usize>(),
-        )?;
+        let bytes = self.read_from_offset(1, size_of::<usize>())?;
         const S: usize = size_of::<usize>();
         let bytes: [u8; S] = bytes.try_into().ok()?;
         Some(usize::from_le_bytes(bytes))

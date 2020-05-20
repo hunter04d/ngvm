@@ -1,6 +1,7 @@
 use crate::code::{Chunk, RefSource};
 use crate::error::VmError;
-use crate::interpreter::{three_stack_metadata, two_stack_metadata, TwoStackMetadata};
+use crate::interpreter::handlers::alu::{AluExtensions, TwoStackMetadata};
+use crate::opcodes::Opcode;
 use crate::operations::markers::*;
 use crate::operations::{BiOp, BiOpMarker, UOp, UOpMarker};
 use crate::refs::{refs_size, ThreeStackRefs, TwoStackRefs};
@@ -17,12 +18,12 @@ where
 {
     let rf = &chunk.read_three_vm()?;
 
-    let meta = three_stack_metadata(vm, rf)?;
+    let meta = vm.three_stack_metadata(rf)?;
 
     if meta.op1.value_type == meta.op2.value_type {
         match meta.op1.value_type {
-            Type::F64 => process_bi_op::<M, f64>(vm, rf)?,
-            Type::F32 => process_bi_op::<M, f32>(vm, rf)?,
+            Type::F64 => process_bi_op::<M, f64>(vm, rf, chunk.single_opcode())?,
+            Type::F32 => process_bi_op::<M, f32>(vm, rf, chunk.single_opcode())?,
             _ => {
                 return Err(VmError::InvalidTypeForOperation(
                     chunk.single_opcode(),
@@ -40,13 +41,13 @@ where
     Ok(1 + refs_size(3))
 }
 
-fn process_bi_op<M, T>(vm: &mut Vm, refs: &ThreeStackRefs) -> Result<(), VmError>
+fn process_bi_op<M, T>(vm: &mut Vm, refs: &ThreeStackRefs, opcode: Opcode) -> Result<(), VmError>
 where
     M: BiOpMarker,
     T: BiOp<M> + FromSingle<StackData>,
     <T as BiOp<M>>::Output: IntoStackData + HasVmType,
 {
-    let meta = three_stack_metadata(vm, refs)?;
+    let meta = vm.three_stack_metadata(refs)?;
     let op1 = T::from_single(*vm.stack_data(meta.op1.index)?);
     let op2 = T::from_single(*vm.stack_data(meta.op2.index)?);
     let r = op1.invoke(op2);
@@ -54,7 +55,7 @@ where
     if meta.result.value_type == <T as BiOp<M>>::Output::get_type() {
         *vm.stack_data_mut(res_index)? = r.into_stack_data();
     } else {
-        return Err(VmError::OutputTypeMismatch);
+        return Err(VmError::OutputTypeMismatch(opcode, meta.result.value_type));
     }
     Ok(())
 }
@@ -66,13 +67,14 @@ where
     <f64 as UOp<M>>::Output: HasVmType + IntoStackData,
     <f32 as UOp<M>>::Output: HasVmType + IntoStackData,
 {
+    let code = chunk.single_opcode();
     let rf = &chunk.read_two().ok_or(VmError::InvalidBytecode)?;
 
-    let meta = two_stack_metadata(vm, rf)?;
+    let meta = vm.two_stack_metadata(rf)?;
 
     match meta.op.value_type {
-        Type::F64 => process_u_op::<M, f64>(vm, rf),
-        Type::F32 => process_u_op::<M, f64>(vm, rf),
+        Type::F64 => process_u_op::<M, f64>(vm, rf, code),
+        Type::F32 => process_u_op::<M, f64>(vm, rf, code),
         _ => Err(VmError::InvalidTypeForOperation(
             chunk.single_opcode(),
             meta.op.value_type,
@@ -80,20 +82,20 @@ where
     }
 }
 
-fn process_u_op<M, T>(vm: &mut Vm, refs: &TwoStackRefs) -> Result<(), VmError>
+fn process_u_op<M, T>(vm: &mut Vm, refs: &TwoStackRefs, opcode: Opcode) -> Result<(), VmError>
 where
     M: UOpMarker,
     T: UOp<M> + FromSingle<StackData>,
     <T as UOp<M>>::Output: IntoStackData + HasVmType,
 {
-    let TwoStackMetadata { result, op } = two_stack_metadata(vm, refs)?;
+    let TwoStackMetadata { result, op } = vm.two_stack_metadata(refs)?;
     let op = T::from_single(*vm.stack_data(op.index)?);
     let r = op.invoke();
     let res_index = result.index;
     if result.value_type == <T as UOp<M>>::Output::get_type() {
         *vm.stack_data_mut(res_index)? = r.into_stack_data();
     } else {
-        return Err(VmError::OutputTypeMismatch);
+        return Err(VmError::OutputTypeMismatch(opcode, result.value_type));
     }
     Ok(())
 }

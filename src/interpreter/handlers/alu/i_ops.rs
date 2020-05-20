@@ -3,7 +3,6 @@ use std::option::NoneError;
 
 use crate::code::Chunk;
 use crate::error::VmError;
-use crate::interpreter::{three_stack_metadata, two_stack_metadata};
 use crate::operations::markers::*;
 use crate::operations::{BiOp, BiOpMarker, UOp, UOpMarker};
 use crate::refs::refs_size;
@@ -11,6 +10,7 @@ use crate::types::Type;
 use crate::vm::{Vm, VmRefSource};
 
 use super::{process_fallible_bi_op, process_fallible_u_op};
+use crate::interpreter::handlers::alu::AluExtensions;
 
 fn handle_bi_signed_op<M: BiOpMarker>(chunk: &Chunk, vm: &mut Vm) -> Result<usize, VmError>
 where
@@ -23,16 +23,17 @@ where
     <i16 as BiOp<M>>::Output: Try<Ok = i16, Error = NoneError>,
     <i8 as BiOp<M>>::Output: Try<Ok = i8, Error = NoneError>,
 {
+    let code = chunk.single_opcode();
     let rf = &chunk.read_three_vm()?;
 
-    let meta = three_stack_metadata(vm, rf)?;
+    let meta = vm.three_stack_metadata(rf)?;
 
     if meta.op1.value_type == meta.op2.value_type {
         match meta.op1.value_type {
-            Type::I64 => process_fallible_bi_op::<M, i64, i64>(vm, rf),
-            Type::I32 => process_fallible_bi_op::<M, i32, i32>(vm, rf),
-            Type::I16 => process_fallible_bi_op::<M, i16, i16>(vm, rf),
-            Type::I8 => process_fallible_bi_op::<M, i8, i8>(vm, rf),
+            Type::I64 => process_fallible_bi_op::<M, i64, i64>(vm, rf, code),
+            Type::I32 => process_fallible_bi_op::<M, i32, i32>(vm, rf, code),
+            Type::I16 => process_fallible_bi_op::<M, i16, i16>(vm, rf, code),
+            Type::I8 => process_fallible_bi_op::<M, i8, i8>(vm, rf, code),
             _ => Err(VmError::InvalidTypeForOperation(
                 chunk.single_opcode(),
                 meta.op1.value_type,
@@ -59,13 +60,14 @@ where
     <i16 as UOp<M>>::Output: Try<Ok = i16, Error = NoneError>,
     <i8 as UOp<M>>::Output: Try<Ok = i8, Error = NoneError>,
 {
+    let code = chunk.single_opcode();
     let rf = &chunk.read_two_vm()?;
-    let meta = two_stack_metadata(vm, rf)?;
+    let meta = vm.two_stack_metadata(rf)?;
     match meta.op.value_type {
-        Type::I64 => process_fallible_u_op::<M, i64>(vm, rf),
-        Type::I32 => process_fallible_u_op::<M, i32>(vm, rf),
-        Type::I16 => process_fallible_u_op::<M, i16>(vm, rf),
-        Type::I8 => process_fallible_u_op::<M, i8>(vm, rf),
+        Type::I64 => process_fallible_u_op::<M, i64>(vm, rf, code),
+        Type::I32 => process_fallible_u_op::<M, i32>(vm, rf, code),
+        Type::I16 => process_fallible_u_op::<M, i16>(vm, rf, code),
+        Type::I8 => process_fallible_u_op::<M, i8>(vm, rf, code),
         _ => Err(VmError::InvalidTypeForOperation(
             chunk.single_opcode(),
             meta.op.value_type,

@@ -1,15 +1,16 @@
 use std::ops::Try;
 use std::option::NoneError;
 
-use crate::code::Chunk;
 use crate::error::VmError;
-use crate::interpreter::{three_stack_metadata, two_stack_metadata};
+use crate::opcodes::Opcode;
 use crate::operations::{BiOp, BiOpMarker, UOp, UOpMarker};
-use crate::refs::{refs_size, ThreeStackRefs, TwoStackRefs};
+use crate::refs::{ThreeStackRefs, TwoStackRefs};
 use crate::stack::data::{FromSingle, IntoStackData, StackData};
-use crate::types::{HasVmType, Type};
-use crate::vm::{Vm, VmRefSource};
+use crate::stack::metadata::StackMetadata;
+use crate::types::HasVmType;
+use crate::vm::Vm;
 
+pub mod bool_ops;
 pub mod f_ops;
 pub mod i_ops;
 pub mod shifts;
@@ -18,6 +19,7 @@ pub mod u_ops;
 fn process_fallible_bi_op<M: BiOpMarker, T, O>(
     vm: &mut Vm,
     refs: &ThreeStackRefs,
+    opcode: Opcode,
 ) -> Result<(), VmError>
 where
     T: FromSingle<StackData> + BiOp<M, O>,
@@ -26,7 +28,7 @@ where
     // see: https://github.com/rust-lang/rust/issues/52662
     <<T as BiOp<M, O>>::Output as Try>::Ok: IntoStackData + HasVmType,
 {
-    let meta = three_stack_metadata(vm, refs)?;
+    let meta = vm.three_stack_metadata(refs)?;
     let op1 = T::from_single(*vm.stack_data(meta.op1.index)?);
     let op2 = O::from_single(*vm.stack_data(meta.op2.index)?);
     let r = op1
@@ -37,7 +39,7 @@ where
     if meta.result.value_type == <<T as BiOp<M, O>>::Output as Try>::Ok::get_type() {
         *vm.stack_data_mut(res_index)? = r.into_stack_data();
     } else {
-        return Err(VmError::OutputTypeMismatch);
+        return Err(VmError::OutputTypeMismatch(opcode, meta.result.value_type));
     }
     Ok(())
 }
@@ -45,6 +47,7 @@ where
 fn process_fallible_u_op<M: UOpMarker, T>(
     vm: &mut Vm,
     TwoStackRefs { result, op }: &TwoStackRefs,
+    opcode: Opcode,
 ) -> Result<(), VmError>
 where
     T: FromSingle<StackData> + UOp<M>,
@@ -60,23 +63,39 @@ where
     if result.value_type == <<T as UOp<M>>::Output as Try>::Ok::get_type() {
         *vm.stack_data_mut(res_index)? = r.into_stack_data();
     } else {
-        return Err(VmError::OutputTypeMismatch);
+        return Err(VmError::OutputTypeMismatch(opcode, result.value_type));
     }
     Ok(())
 }
 
-pub(in crate::interpreter) fn handle_b_not(chunk: &Chunk, vm: &mut Vm) -> Result<usize, VmError> {
-    let refs = chunk.read_two_vm()?;
-    let meta = two_stack_metadata(vm, &refs)?;
-    if meta.result.value_type != Type::Bool {
-        return Err(VmError::OutputTypeMismatch);
-    }
-    if !meta.op.value_type.is_primitive() {
-        return Err(VmError::UOpError);
+struct ThreeStackMetadata<'a> {
+    result: &'a StackMetadata,
+    op1: &'a StackMetadata,
+    op2: &'a StackMetadata,
+}
+
+struct TwoStackMetadata<'a> {
+    result: &'a StackMetadata,
+    op: &'a StackMetadata,
+}
+
+trait AluExtensions {
+    fn three_stack_metadata(&self, refs: &ThreeStackRefs) -> Result<ThreeStackMetadata, VmError>;
+
+    fn two_stack_metadata(&self, refs: &TwoStackRefs) -> Result<TwoStackMetadata, VmError>;
+}
+
+impl AluExtensions for Vm {
+    fn three_stack_metadata(&self, refs: &ThreeStackRefs) -> Result<ThreeStackMetadata, VmError> {
+        let result = self.stack_metadata(refs.result)?;
+        let op1 = self.stack_metadata(refs.op1)?;
+        let op2 = self.stack_metadata(refs.op2)?;
+        Ok(ThreeStackMetadata { result, op1, op2 })
     }
 
-    let data = *vm.stack_data(meta.op.index)?;
-    let res_index = meta.result.index;
-    *vm.stack_data_mut(res_index)? = data.iter().any(|&v| v != 0u8).into_stack_data();
-    Ok(1 + refs_size(2))
+    fn two_stack_metadata(&self, refs: &TwoStackRefs) -> Result<TwoStackMetadata, VmError> {
+        let result = self.stack_metadata(refs.result)?;
+        let op = self.stack_metadata(refs.op)?;
+        Ok(TwoStackMetadata { result, op })
+    }
 }

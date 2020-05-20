@@ -26,6 +26,9 @@ pub struct Vm {
     pub(crate) current_module: String,
 }
 
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+pub struct StackDataRef(pub usize);
+
 impl Vm {
     pub fn with_module(m: Module) -> Self {
         let mut map = HashMap::new();
@@ -41,12 +44,12 @@ impl Vm {
         }
     }
 
-    pub fn stack_data(&self, index: StackRef) -> Result<&StackData, VmError> {
+    pub fn stack_data(&self, index: StackDataRef) -> Result<&StackData, VmError> {
         self.stack
             .get(self.last_stack_frame + index.0)
             .ok_or(VmError::BadVmState)
     }
-    pub fn stack_data_opt(&self, index: StackRef) -> Option<&StackData> {
+    pub fn stack_data_opt(&self, index: StackDataRef) -> Option<&StackData> {
         self.stack.get(self.last_stack_frame + index.0)
     }
 
@@ -56,7 +59,7 @@ impl Vm {
             .ok_or(VmError::BadVmState)
     }
 
-    pub fn stack_data_mut(&mut self, index: StackRef) -> Result<&mut StackData, VmError> {
+    pub fn stack_data_mut(&mut self, index: StackDataRef) -> Result<&mut StackData, VmError> {
         self.stack
             .get_mut(self.last_stack_frame + index.0)
             .ok_or(VmError::BadVmState)
@@ -132,7 +135,8 @@ impl VmRefSource for Chunk<'_> {
     type VmError = VmError;
 
     fn read_from_offset_vm(&self, offset: usize, size: usize) -> Result<&[u8], Self::VmError> {
-        self.read_from_offset(offset, size).ok_or(VmError::InvalidBytecode)
+        self.read_from_offset(offset, size)
+            .ok_or(VmError::InvalidBytecode)
     }
 
     fn read_ref_vm(&self, index: usize) -> Result<Ref, Self::VmError> {
@@ -140,7 +144,8 @@ impl VmRefSource for Chunk<'_> {
     }
 
     fn read_ref_with_offset_vm(&self, index: usize) -> Result<Ref, Self::VmError> {
-        self.read_ref_with_offset(index).ok_or(VmError::InvalidBytecode)
+        self.read_ref_with_offset(index)
+            .ok_or(VmError::InvalidBytecode)
     }
 
     fn read_offset_vm(&self) -> Result<usize, Self::VmError> {

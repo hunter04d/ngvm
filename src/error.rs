@@ -14,7 +14,7 @@ pub enum VmError {
     #[error("Operands have mismatched types. Opcode {0:?} does not work with {1:?} and {2:?}")]
     OperandsTypeMismatch(Opcode, Type, Type),
     #[error("Output types mismatch")]
-    OutputTypeMismatch,
+    OutputTypeMismatch(Opcode, Type),
     #[error("Error while processing a binary operation")]
     BiOpError,
     #[error("Error while processing a unary operation")]

@@ -3,8 +3,7 @@ use std::option::NoneError;
 
 use crate::code::Chunk;
 use crate::error::VmError;
-use crate::interpreter::handlers::alu::process_fallible_bi_op;
-use crate::interpreter::three_stack_metadata;
+use crate::interpreter::handlers::alu::{process_fallible_bi_op, AluExtensions};
 use crate::operations::markers::*;
 use crate::operations::{BiOp, BiOpMarker};
 use crate::refs::refs_size;
@@ -30,20 +29,21 @@ where
     <i16 as BiOp<M, u32>>::Output: Try<Ok = i16, Error = NoneError>,
     <i8 as BiOp<M, u32>>::Output: Try<Ok = i8, Error = NoneError>,
 {
+    let code = chunk.single_opcode();
     let rf = &chunk.read_three_vm()?;
 
-    let meta = three_stack_metadata(vm, rf)?;
+    let meta = vm.three_stack_metadata(rf)?;
 
     if matches!(meta.op2.value_type, Type::U32 | Type::U16 | Type::U8) {
         match meta.op1.value_type {
-            Type::U64 => process_fallible_bi_op::<M, u64, u32>(vm, rf),
-            Type::U32 => process_fallible_bi_op::<M, u32, u32>(vm, rf),
-            Type::U16 => process_fallible_bi_op::<M, u16, u32>(vm, rf),
-            Type::U8 => process_fallible_bi_op::<M, u8, u32>(vm, rf),
-            Type::I64 => process_fallible_bi_op::<M, i64, u32>(vm, rf),
-            Type::I32 => process_fallible_bi_op::<M, i32, u32>(vm, rf),
-            Type::I16 => process_fallible_bi_op::<M, i16, u32>(vm, rf),
-            Type::I8 => process_fallible_bi_op::<M, i8, u32>(vm, rf),
+            Type::U64 => process_fallible_bi_op::<M, u64, u32>(vm, rf, code),
+            Type::U32 => process_fallible_bi_op::<M, u32, u32>(vm, rf, code),
+            Type::U16 => process_fallible_bi_op::<M, u16, u32>(vm, rf, code),
+            Type::U8 => process_fallible_bi_op::<M, u8, u32>(vm, rf, code),
+            Type::I64 => process_fallible_bi_op::<M, i64, u32>(vm, rf, code),
+            Type::I32 => process_fallible_bi_op::<M, i32, u32>(vm, rf, code),
+            Type::I16 => process_fallible_bi_op::<M, i16, u32>(vm, rf, code),
+            Type::I8 => process_fallible_bi_op::<M, i8, u32>(vm, rf, code),
             _ => Err(VmError::InvalidTypeForOperation(
                 chunk.single_opcode(),
                 meta.op1.value_type,

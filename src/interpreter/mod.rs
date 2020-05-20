@@ -1,10 +1,9 @@
-use handlers::{alu::f_ops::*, alu::i_ops::*, alu::shifts::*, alu::u_ops::*, load::*, *};
+use handlers::{
+    alu::bool_ops::*, alu::f_ops::*, alu::i_ops::*, alu::shifts::*, alu::u_ops::*, load::*, *,
+};
 
 use crate::code::Chunk;
 use crate::error::VmError;
-use crate::interpreter::handlers::alu::handle_b_not;
-use crate::refs::{ThreeStackRefs, TwoStackRefs};
-use crate::stack::metadata::StackMetadata;
 use crate::Vm;
 
 pub mod handlers;
@@ -13,9 +12,7 @@ pub mod stack_tracer;
 type IntHandler = fn(&Chunk, &mut Vm) -> Result<usize, VmError>;
 /// All the functions than handle the specific opcode
 pub(crate) static HANDLERS: [IntHandler; 256] = [
-    // U64 LD 0
-    handle_u64_ld0, // 0
-    // I64 LD 0
+    handle_u64_ld0,           // 0
     handle_i64_ld0,           // 1
     handle_ld_typed0,         // 2
     handle_ld_type,           // 3
@@ -42,11 +39,11 @@ pub(crate) static HANDLERS: [IntHandler; 256] = [
     handle_f_div,             // 24
     handle_f_rem,             // 25
     handle_f_neg,             // 26
-    noop,                     // 27
-    noop,                     // 28
+    handle_b_and,             // 27
+    handle_b_or,              // 28
     handle_b_not,             // 29
-    noop,                     // 30
-    noop,                     // 31
+    handle_b_be,              // 30
+    handle_b_xor,             // 31
     noop,                     // 32
     noop,                     // 33
     noop,                     // 34
@@ -272,33 +269,3 @@ pub(crate) static HANDLERS: [IntHandler; 256] = [
     handle_trace_stack_value, // 254
     handle_wide,              // 255  Handle two-byte instruction
 ];
-
-struct ThreeStackMetadata<'a> {
-    result: &'a StackMetadata,
-    op1: &'a StackMetadata,
-    op2: &'a StackMetadata,
-}
-
-struct TwoStackMetadata<'a> {
-    result: &'a StackMetadata,
-    op: &'a StackMetadata,
-}
-
-fn three_stack_metadata<'a>(
-    vm: &'a Vm,
-    refs: &ThreeStackRefs,
-) -> Result<ThreeStackMetadata<'a>, VmError> {
-    let result = vm.stack_metadata(refs.result)?;
-    let op1 = vm.stack_metadata(refs.op1)?;
-    let op2 = vm.stack_metadata(refs.op2)?;
-    Ok(ThreeStackMetadata { result, op1, op2 })
-}
-
-fn two_stack_metadata<'a>(
-    vm: &'a Vm,
-    refs: &TwoStackRefs,
-) -> Result<TwoStackMetadata<'a>, VmError> {
-    let result = vm.stack_metadata(refs.result)?;
-    let op = vm.stack_metadata(refs.op)?;
-    Ok(TwoStackMetadata { result, op })
-}

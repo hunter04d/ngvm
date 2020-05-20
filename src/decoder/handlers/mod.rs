@@ -144,7 +144,8 @@ pub(super) fn decode_jc(chunk: &Chunk) -> Option<DecodedOpcode> {
     let condition = chunk.read_ref_stack(1)?;
     let refs = DecoderRefs::Two(
         DecoderRef::offset(offset, tags::OFFSET),
-        DecoderRef::new(condition, tags::CONDITION));
+        DecoderRef::new(condition, tags::CONDITION),
+    );
     Some(DecodedOpcode::new(Opcode::J, refs))
 }
 

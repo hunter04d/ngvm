@@ -1,4 +1,5 @@
 use num_enum::{IntoPrimitive, TryFromPrimitive};
+use std::convert::TryFrom;
 
 #[repr(u16)]
 #[derive(Debug, Eq, PartialEq, Copy, Clone, IntoPrimitive, TryFromPrimitive)]
@@ -79,31 +80,53 @@ pub enum Opcode {
 }
 
 pub enum OpcodeKind {
+    Single,
+    Double,
+}
+
+#[derive(Debug)]
+pub enum OpcodeType {
     Single(u8),
     Double(u8),
 }
 
 impl Opcode {
-    pub fn kind(self) -> OpcodeKind {
+    pub fn to_type(self) -> OpcodeType {
         let num: u16 = self.into();
         if num < 256 {
-            OpcodeKind::Single(num as u8)
+            OpcodeType::Single(num as u8)
         } else {
-            OpcodeKind::Double((num - 256) as u8)
+            OpcodeType::Double((num - 256) as u8)
         }
     }
 
     pub fn bytes(self) -> Vec<u8> {
-        match self.kind() {
-            OpcodeKind::Single(c) => vec![c],
-            OpcodeKind::Double(c) => vec![255, c],
+        match self.to_type() {
+            OpcodeType::Single(c) => vec![c],
+            OpcodeType::Double(c) => vec![u8::MAX, c],
         }
     }
 
     pub fn size(self) -> usize {
-        match self.kind() {
-            OpcodeKind::Single(_) => 1,
-            OpcodeKind::Double(_) => 2,
+        match self.to_type() {
+            OpcodeType::Single(_) => 1,
+            OpcodeType::Double(_) => 2,
+        }
+    }
+
+    pub fn single(value: u8) -> Option<Self> {
+        Self::try_from(value as u16).ok()
+    }
+
+    pub fn double(value: u8) -> Option<Self> {
+        let value = (value as u16) + u8::MAX as u16;
+        Self::try_from(value + 256).ok()
+    }
+
+    pub fn from_kind(value: u8, kind: OpcodeKind) -> Option<Self> {
+        match kind {
+            OpcodeKind::Single => Self::single(value),
+            OpcodeKind::Double => Self::double(value),
         }
     }
 }

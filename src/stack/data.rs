@@ -41,7 +41,7 @@ derive_from_single_for_types!(u8, u16, u32, u64, i8, i16, i32, i64, f32, f64);
 
 impl FromSingle<StackData> for bool {
     #[inline]
-    fn from_single(obj: [u8; 8]) -> Self {
+    fn from_single(obj: StackData) -> Self {
         obj.iter().any(|&v| v != 0u8)
     }
 }
@@ -85,12 +85,24 @@ where
     }
 }
 
-impl IntoStackData for bool {
-    fn into_stack_data(self) -> StackData {
+impl FromPrimitive<bool> for StackData {
+    fn from_primitive(obj: bool) -> Self {
         let mut data: StackData = Default::default();
-        if self {
+        if obj {
             data[0] |= 0b01;
         }
         data
+    }
+}
+
+impl FromPrimitive<()> for StackData {
+    fn from_primitive(_: ()) -> Self {
+        Default::default()
+    }
+}
+
+impl FromPrimitive<char> for StackData {
+    fn from_primitive(obj: char) -> Self {
+        u32::from(obj).into_stack_data()
     }
 }

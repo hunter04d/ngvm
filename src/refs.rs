@@ -42,7 +42,7 @@ impl VmRef {
         match self {
             VmRef::Stack(r) => Vec::from(r.0.to_le_bytes()),
             VmRef::Pool(r) => Vec::from(r.0.to_le_bytes()),
-            VmRef::Offset(r) =>Vec::from(r.to_le_bytes()),
+            VmRef::Offset(r) => Vec::from(r.to_le_bytes()),
         }
     }
 }
