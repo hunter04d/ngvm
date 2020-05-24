@@ -3,6 +3,8 @@ use crate::code::Chunk;
 use crate::error::VmError;
 use crate::refs::refs_size;
 use crate::stack::data::{FromPrimitive, FromSingle, IntoStackData, StackData};
+use crate::types::checker::{HasTypeCheckerCtx, TypeCheckerCtx};
+use crate::types::PrimitiveType;
 use crate::vm::VmRefSource;
 use crate::Vm;
 
@@ -14,27 +16,23 @@ fn handle_bi_op(
     let rf = &chunk.read_three_vm()?;
 
     let meta = vm.three_stack_metadata(rf)?;
+    let mut t_ctx = TypeCheckerCtx::new();
+    let _ = meta
+        .check(&mut t_ctx)
+        .all_primitives()
+        .result()
+        .equals(PrimitiveType::Bool)
+        .operands()
+        .same()
+        .and()
+        .user()
+        .get_vm()?;
 
-    if meta.op1.value_type.is_primitive() && meta.op1.value_type == meta.op2.value_type {
-        if meta.result.value_type.is_bool() {
-            let op1 = *vm.stack_data(meta.op1.index)?;
-            let op2 = *vm.stack_data(meta.op2.index)?;
-            let index = meta.result.index;
-            *vm.stack_data_mut(index)? = processor(op1, op2);
-            Ok(1 + refs_size(3))
-        } else {
-            Err(VmError::InvalidTypeForOperation(
-                chunk.single_opcode(),
-                meta.result.value_type,
-            ))
-        }
-    } else {
-        Err(VmError::OperandsTypeMismatch(
-            chunk.single_opcode(),
-            meta.op1.value_type,
-            meta.op2.value_type,
-        ))
-    }
+    let op1 = *vm.stack_data(meta.op1.index)?;
+    let op2 = *vm.stack_data(meta.op2.index)?;
+    let index = meta.result.index;
+    *vm.stack_data_mut(index)? = processor(op1, op2);
+    Ok(1 + refs_size(3))
 }
 
 fn handle_u_op(
@@ -46,24 +44,20 @@ fn handle_u_op(
 
     let meta = vm.two_stack_metadata(rf)?;
 
-    if meta.op.value_type.is_primitive() {
-        if meta.result.value_type.is_bool() {
-            let op = vm.stack_data(meta.op.index)?;
-            let index = meta.result.index;
-            *vm.stack_data_mut(index)? = processor(*op);
-            Ok(1 + refs_size(3))
-        } else {
-            Err(VmError::OutputTypeMismatch(
-                chunk.single_opcode(),
-                meta.result.value_type,
-            ))
-        }
-    } else {
-        Err(VmError::InvalidTypeForOperation(
-            chunk.single_opcode(),
-            meta.op.value_type,
-        ))
-    }
+    let t_ctx = &mut TypeCheckerCtx::new();
+    let _ = meta
+        .check(t_ctx)
+        .all_primitives()
+        .result()
+        .bool()
+        .op()
+        .user()
+        .get_vm()?;
+
+    let op = vm.stack_data(meta.op.index)?;
+    let index = meta.result.index;
+    *vm.stack_data_mut(index)? = processor(*op);
+    Ok(1 + refs_size(3))
 }
 
 fn be(op: StackData) -> bool {

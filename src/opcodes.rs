@@ -1,8 +1,8 @@
-use num_enum::{IntoPrimitive, TryFromPrimitive};
-use std::convert::TryFrom;
+use num_derive::{FromPrimitive, ToPrimitive};
+use num_traits::{FromPrimitive, ToPrimitive};
 
 #[repr(u16)]
-#[derive(Debug, Eq, PartialEq, Copy, Clone, IntoPrimitive, TryFromPrimitive)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone, ToPrimitive, FromPrimitive)]
 pub enum Opcode {
     U64Ld0 = 0,
     I64Ld0 = 1,
@@ -92,7 +92,7 @@ pub enum OpcodeType {
 
 impl Opcode {
     pub fn to_type(self) -> OpcodeType {
-        let num: u16 = self.into();
+        let num: u16 = self.to_u16().unwrap();
         if num < 256 {
             OpcodeType::Single(num as u8)
         } else {
@@ -115,12 +115,12 @@ impl Opcode {
     }
 
     pub fn single(value: u8) -> Option<Self> {
-        Self::try_from(value as u16).ok()
+        Self::from_u8(value)
     }
 
     pub fn double(value: u8) -> Option<Self> {
         let value = (value as u16) + u8::MAX as u16;
-        Self::try_from(value + 256).ok()
+        Self::from_u16(value + 256)
     }
 
     pub fn from_kind(value: u8, kind: OpcodeKind) -> Option<Self> {

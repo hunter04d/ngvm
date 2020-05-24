@@ -2,31 +2,32 @@ use std::ops::Try;
 use std::option::NoneError;
 
 use crate::error::VmError;
-use crate::opcodes::Opcode;
 use crate::operations::{BiOp, BiOpMarker, UOp, UOpMarker};
 use crate::refs::{ThreeStackRefs, TwoStackRefs};
 use crate::stack::data::{FromSingle, IntoStackData, StackData};
 use crate::stack::metadata::StackMetadata;
-use crate::types::HasVmType;
+use crate::types::checker::{ThreeTypesChecker, TwoTypesChecker, TypeCheckerCtx};
+use crate::types::HasPrimitiveType;
 use crate::vm::Vm;
 
 pub mod bool_ops;
+pub mod cmp_ops;
 pub mod f_ops;
 pub mod i_ops;
+pub mod logic_ops;
 pub mod shifts;
 pub mod u_ops;
 
 fn process_fallible_bi_op<M: BiOpMarker, T, O>(
     vm: &mut Vm,
     refs: &ThreeStackRefs,
-    opcode: Opcode,
 ) -> Result<(), VmError>
 where
     T: FromSingle<StackData> + BiOp<M, O>,
     O: FromSingle<StackData>,
     <T as BiOp<M, O>>::Output: Try<Error = NoneError>,
     // see: https://github.com/rust-lang/rust/issues/52662
-    <<T as BiOp<M, O>>::Output as Try>::Ok: IntoStackData + HasVmType,
+    <<T as BiOp<M, O>>::Output as Try>::Ok: IntoStackData + HasPrimitiveType,
 {
     let meta = vm.three_stack_metadata(refs)?;
     let op1 = T::from_single(*vm.stack_data(meta.op1.index)?);
@@ -36,35 +37,26 @@ where
         .into_result()
         .map_err(|_| VmError::BiOpError)?;
     let res_index = meta.result.index;
-    if meta.result.value_type == <<T as BiOp<M, O>>::Output as Try>::Ok::get_type() {
-        *vm.stack_data_mut(res_index)? = r.into_stack_data();
-    } else {
-        return Err(VmError::OutputTypeMismatch(opcode, meta.result.value_type));
-    }
+    *vm.stack_data_mut(res_index)? = r.into_stack_data();
     Ok(())
 }
 
 fn process_fallible_u_op<M: UOpMarker, T>(
     vm: &mut Vm,
     TwoStackRefs { result, op }: &TwoStackRefs,
-    opcode: Opcode,
 ) -> Result<(), VmError>
 where
     T: FromSingle<StackData> + UOp<M>,
     <T as UOp<M>>::Output: Try<Error = NoneError>,
     // see: https://github.com/rust-lang/rust/issues/52662
-    <<T as UOp<M>>::Output as Try>::Ok: IntoStackData + HasVmType,
+    <<T as UOp<M>>::Output as Try>::Ok: IntoStackData + HasPrimitiveType,
 {
     let op = vm.stack_metadata(*op)?;
     let result = vm.stack_metadata(*result)?;
     let op = T::from_single(*vm.stack_data(op.index)?);
     let r = op.invoke().into_result().map_err(|_| VmError::UOpError)?;
     let res_index = result.index;
-    if result.value_type == <<T as UOp<M>>::Output as Try>::Ok::get_type() {
-        *vm.stack_data_mut(res_index)? = r.into_stack_data();
-    } else {
-        return Err(VmError::OutputTypeMismatch(opcode, result.value_type));
-    }
+    *vm.stack_data_mut(res_index)? = r.into_stack_data();
     Ok(())
 }
 
@@ -77,6 +69,27 @@ struct ThreeStackMetadata<'a> {
 struct TwoStackMetadata<'a> {
     result: &'a StackMetadata,
     op: &'a StackMetadata,
+}
+
+impl<'a> ThreeStackMetadata<'a> {
+    fn check<'c>(&'a self, ctx: &'c mut TypeCheckerCtx) -> ThreeTypesChecker<'a, 'c> {
+        ThreeTypesChecker {
+            result: &self.result.value_type,
+            op1: &self.op1.value_type,
+            op2: &self.op2.value_type,
+            ctx,
+        }
+    }
+}
+
+impl<'a> TwoStackMetadata<'a> {
+    fn check<'c>(&'a self, ctx: &'c mut TypeCheckerCtx) -> TwoTypesChecker<'a, 'c> {
+        TwoTypesChecker {
+            result: &self.result.value_type,
+            op: &self.op.value_type,
+            ctx,
+        }
+    }
 }
 
 trait AluExtensions {

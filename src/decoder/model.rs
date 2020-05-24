@@ -18,7 +18,7 @@ pub struct DecoderRef {
     ///
     /// Tag generally signifies what the reference means
     /// Common tags can be found in [super::tags](tags module)
-    pub tag: Option<Cow<'static, str>>,
+    pub tag: Cow<'static, str>,
     /// Reference to value somewhere in the vm
     pub vm_ref: VmRef,
 }
@@ -26,21 +26,21 @@ pub struct DecoderRef {
 impl DecoderRef {
     pub fn new_with_no_tag(vm_ref: impl Into<VmRef>) -> Self {
         Self {
-            tag: None,
+            tag: "".into(),
             vm_ref: vm_ref.into(),
         }
     }
 
     pub fn new(vm_ref: impl Into<VmRef>, tag: impl Into<Cow<'static, str>>) -> Self {
         Self {
-            tag: Some(tag.into()),
+            tag: tag.into(),
             vm_ref: vm_ref.into(),
         }
     }
 
     pub fn offset(r: usize, tag: impl Into<Cow<'static, str>>) -> Self {
         Self {
-            tag: Some(tag.into()),
+            tag: tag.into(),
             vm_ref: VmRef::Offset(r),
         }
     }
@@ -54,8 +54,8 @@ impl Display for DecoderRef {
             VmRef::Offset(r) => ("*", r),
         };
         f.write_str(symbol)?;
-        if let Some(tag) = &self.tag {
-            write!(f, "<{}>", *tag)?;
+        if self.tag.is_empty() {
+            write!(f, "<{}>", self.tag)?;
         }
         write!(f, "{}", value)?;
         Ok(())

@@ -1,12 +1,12 @@
 use std::mem::size_of;
 
-use crate::types::Type;
+use crate::types::PrimitiveType;
 use std::convert::TryInto;
 #[derive(Debug)]
 pub enum Constant {
     Value([u8; 16]),
     String(Box<str>),
-    Type(Type),
+    Type(PrimitiveType),
     // TODO
     /// Pointed type for things like Arr->i32, Ref->u64, etc.
     PointedType,
@@ -27,8 +27,8 @@ macro_rules! impl_from {
 
 impl_from!(u8, u16, u32, u64, u128, i8, i16, i32, i64, i128, f32, f64);
 
-impl From<Type> for Constant {
-    fn from(t: Type) -> Self {
+impl From<PrimitiveType> for Constant {
+    fn from(t: PrimitiveType) -> Self {
         Constant::Type(t)
     }
 }
@@ -48,7 +48,7 @@ impl ConstantPool {
         self.0.get(index)
     }
 
-    pub fn get_type(&self, index: usize) -> Option<Type> {
+    pub fn get_type(&self, index: usize) -> Option<PrimitiveType> {
         if let Some(Constant::Type(t)) = self.get(index) {
             Some(*t)
         } else {

@@ -1,5 +1,6 @@
 use handlers::{
-    alu::bool_ops::*, alu::f_ops::*, alu::i_ops::*, alu::shifts::*, alu::u_ops::*, load::*, *,
+    alu::bool_ops::*, alu::cmp_ops::*, alu::f_ops::*, alu::i_ops::*, alu::shifts::*, alu::u_ops::*,
+    load::*, *,
 };
 
 use crate::code::Chunk;
@@ -52,12 +53,12 @@ pub(crate) static HANDLERS: [IntHandler; 256] = [
     handle_shr,               // 37
     handle_rotl,              // 38
     handle_rotr,              // 39
-    noop,                     // 40
-    noop,                     // 41
-    noop,                     // 42
-    noop,                     // 43
-    noop,                     // 44
-    noop,                     // 45
+    handle_ge,                // 40
+    handle_gt,                // 41
+    handle_le,                // 42
+    handle_lt,                // 43
+    handle_eq,                // 44
+    handle_ne,                // 45
     noop,                     // 46
     noop,                     // 47
     noop,                     // 48

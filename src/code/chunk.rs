@@ -40,6 +40,7 @@ impl<'a> Chunk<'a> {
 
     const ERROR_INVALID_OPCODE: &'static str = "FATAL ERROR: Invalid opcode";
 
+    #[allow(dead_code)]
     pub(crate) fn single_opcode(&self) -> Opcode {
         Opcode::single(self.read_byte()).expect(Self::ERROR_INVALID_OPCODE)
     }
@@ -63,7 +64,7 @@ impl<'a> From<&'a Code> for Chunk<'a> {
 impl<'a> RefSource for Chunk<'a> {
     fn read_from_offset(&self, offset: usize, size: usize) -> Option<&[u8]> {
         let offset = self.offset + offset;
-        if offset + size < self.bytes.len() {
+        if offset + size <= self.bytes.len() {
             Some(&self.bytes[offset..offset + size])
         } else {
             None

@@ -74,6 +74,12 @@ pub enum Opcode {
     Shr(ThreeStackRefs),
     RotL(ThreeStackRefs),
     RotR(ThreeStackRefs),
+    Ge(ThreeStackRefs),
+    Gt(ThreeStackRefs),
+    Le(ThreeStackRefs),
+    Lt(ThreeStackRefs),
+    Eq(ThreeStackRefs),
+    Ne(ThreeStackRefs),
 
     TraceStackValue(StackRef),
 }
@@ -124,6 +130,13 @@ impl Opcode {
             Shr(v) => with_three_refs(Nc::Shr, v),
             RotL(v) => with_three_refs(Nc::RotL, v),
             RotR(v) => with_three_refs(Nc::RotR, v),
+
+            Ge(v) => with_three_refs(Nc::Ge, v),
+            Gt(v) => with_three_refs(Nc::Gt, v),
+            Le(v) => with_three_refs(Nc::Le, v),
+            Lt(v) => with_three_refs(Nc::Lt, v),
+            Eq(v) => with_three_refs(Nc::Eq, v),
+            Ne(v) => with_three_refs(Nc::Ne, v),
             TraceStackValue(v) => with_one_ref(Nc::TraceStackValue, v.0),
         }
     }

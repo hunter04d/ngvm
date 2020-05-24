@@ -7,7 +7,8 @@ use crate::interpreter::handlers::alu::{process_fallible_bi_op, AluExtensions};
 use crate::operations::markers::*;
 use crate::operations::{BiOp, BiOpMarker};
 use crate::refs::refs_size;
-use crate::types::Type;
+use crate::types::checker::{HasTypeCheckerCtx, Taggable, TypeCheckerCtx};
+use crate::types::{PrimitiveType, VmType};
 use crate::vm::{Vm, VmRefSource};
 
 fn handle_shift_op<M: BiOpMarker>(chunk: &Chunk, vm: &mut Vm) -> Result<usize, VmError>
@@ -29,34 +30,34 @@ where
     <i16 as BiOp<M, u32>>::Output: Try<Ok = i16, Error = NoneError>,
     <i8 as BiOp<M, u32>>::Output: Try<Ok = i8, Error = NoneError>,
 {
-    let code = chunk.single_opcode();
     let rf = &chunk.read_three_vm()?;
 
     let meta = vm.three_stack_metadata(rf)?;
+    let mut type_checker = TypeCheckerCtx::new();
+    let types = meta
+        .check(&mut type_checker)
+        .all_primitives()
+        .op2()
+        .one_of(&[PrimitiveType::U32, PrimitiveType::U16, PrimitiveType::U8])
+        .result()
+        .along_with(|c| c.op1())
+        .are_same()
+        .and()
+        .get_vm()?;
 
-    if matches!(meta.op2.value_type, Type::U32 | Type::U16 | Type::U8) {
-        match meta.op1.value_type {
-            Type::U64 => process_fallible_bi_op::<M, u64, u32>(vm, rf, code),
-            Type::U32 => process_fallible_bi_op::<M, u32, u32>(vm, rf, code),
-            Type::U16 => process_fallible_bi_op::<M, u16, u32>(vm, rf, code),
-            Type::U8 => process_fallible_bi_op::<M, u8, u32>(vm, rf, code),
-            Type::I64 => process_fallible_bi_op::<M, i64, u32>(vm, rf, code),
-            Type::I32 => process_fallible_bi_op::<M, i32, u32>(vm, rf, code),
-            Type::I16 => process_fallible_bi_op::<M, i16, u32>(vm, rf, code),
-            Type::I8 => process_fallible_bi_op::<M, i8, u32>(vm, rf, code),
-            _ => Err(VmError::InvalidTypeForOperation(
-                chunk.single_opcode(),
-                meta.op1.value_type,
-            )),
-        }
-    } else {
-        Err(VmError::OperandsTypeMismatch(
-            chunk.single_opcode(),
-            meta.op1.value_type,
-            meta.op2.value_type,
-        ))
+    match types.op1 {
+        PrimitiveType::U64 => process_fallible_bi_op::<M, u64, u32>(vm, rf),
+        PrimitiveType::U32 => process_fallible_bi_op::<M, u32, u32>(vm, rf),
+        PrimitiveType::U16 => process_fallible_bi_op::<M, u16, u32>(vm, rf),
+        PrimitiveType::U8 => process_fallible_bi_op::<M, u8, u32>(vm, rf),
+        PrimitiveType::I64 => process_fallible_bi_op::<M, i64, u32>(vm, rf),
+        PrimitiveType::I32 => process_fallible_bi_op::<M, i32, u32>(vm, rf),
+        PrimitiveType::I16 => process_fallible_bi_op::<M, i16, u32>(vm, rf),
+        PrimitiveType::I8 => process_fallible_bi_op::<M, i8, u32>(vm, rf),
+        _ => Err(VmError::InvalidTypeForOperation(
+            VmType::from(types.op1).no_tag(),
+        )),
     }?;
-
     Ok(1 + refs_size(3))
 }
 

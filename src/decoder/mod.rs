@@ -264,6 +264,5 @@ pub(crate) static HANDLERS: [fn(&Chunk) -> Option<DecodedOpcode>; 256] = [
     noop,                     // 252
     noop,                     // 253
     decode_debug_stack_value, // 254
-    // Handle two-byte instruction
     decode_wide, // 255
 ];

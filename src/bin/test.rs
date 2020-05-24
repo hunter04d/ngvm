@@ -1,6 +1,6 @@
 use ngvm::model::Opcode::*;
 use ngvm::refs::{one, three, PoolRef};
-use ngvm::types::Type::*;
+use ngvm::types::PrimitiveType::*;
 use ngvm::{Code, ConstantPool, Module, Vm};
 
 fn main() {
@@ -8,6 +8,7 @@ fn main() {
     // spin up a vm instance
     println!("{:?}", pool);
     let mut vm = Vm::with_module(Module::new(pool));
+
     let code: Code = vec![
         LDType {
             type_location: PoolRef(0),
@@ -17,13 +18,10 @@ fn main() {
             type_location: PoolRef(0),
             value_location: PoolRef(2),
         },
-        LdTyped0 {
-            type_location: PoolRef(0),
-        },
-        FAdd(three(2, 0, 1)),
+        LdFalse,
+        Le(three(2, 0, 1)),
         TraceStackValue(one(2)),
-    ]
-    .into();
+    ].into();
     let decode = code.decode();
     if !decode.is_full {
         panic!("Bad code")

@@ -4,7 +4,7 @@ use crate::code::{Chunk, RefSource};
 use crate::error::VmError;
 use crate::refs::{PoolRef, Ref, StackRef, ThreeStackRefs, TwoStackRefs};
 use crate::stack::{data::StackData, metadata::StackMetadata};
-use crate::types::Type;
+use crate::types::PrimitiveType;
 use crate::{ConstantPool, Module};
 
 pub struct Vm {
@@ -65,17 +65,17 @@ impl Vm {
             .ok_or(VmError::BadVmState)
     }
 
-    pub fn push_stack_data_with_type(&mut self, value: StackData, t: Type) {
+    pub fn push_stack_data_with_type(&mut self, value: StackData, t: PrimitiveType) {
         self.last_pushed_value += 1;
         self.stack_metadata
-            .push(StackMetadata::new(t, StackRef(self.stack.len())));
+            .push(StackMetadata::new(t.into(), StackRef(self.stack.len())));
         self.stack.push(value);
     }
 
-    pub fn push_default_with_type(&mut self, t: Type) {
+    pub fn push_default_with_type(&mut self, t: PrimitiveType) {
         self.last_pushed_value += 1;
         self.stack_metadata
-            .push(StackMetadata::new(t, StackRef(self.stack.len())));
+            .push(StackMetadata::new(t.into(), StackRef(self.stack.len())));
         self.stack.push(Default::default());
     }
 

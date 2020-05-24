@@ -2,21 +2,21 @@ use crate::code::Chunk;
 use crate::error::VmError;
 use crate::refs::refs_size;
 use crate::stack::data::IntoStackData;
-use crate::types::Type;
+use crate::types::PrimitiveType;
 use crate::vm::{Vm, VmRefSource};
 
 pub(in crate::interpreter) fn handle_u64_ld0(_: &Chunk, vm: &mut Vm) -> Result<usize, VmError> {
-    vm.push_default_with_type(Type::U64);
+    vm.push_default_with_type(PrimitiveType::U64);
     Ok(1)
 }
 
 pub(in crate::interpreter) fn handle_i64_ld0(_: &Chunk, vm: &mut Vm) -> Result<usize, VmError> {
-    vm.push_default_with_type(Type::I64);
+    vm.push_default_with_type(PrimitiveType::I64);
     Ok(1)
 }
 
 pub(in crate::interpreter) fn handle_ld_unit(_: &Chunk, vm: &mut Vm) -> Result<usize, VmError> {
-    vm.push_stack_data_with_type(Default::default(), Type::Unit);
+    vm.push_stack_data_with_type(Default::default(), PrimitiveType::Unit);
     Ok(1)
 }
 
@@ -44,11 +44,11 @@ pub(in crate::interpreter) fn handle_ld_type(chunk: &Chunk, vm: &mut Vm) -> Resu
 }
 
 pub(in crate::interpreter) fn handle_ld_true(_: &Chunk, vm: &mut Vm) -> Result<usize, VmError> {
-    vm.push_stack_data_with_type(true.into_stack_data(), Type::Bool);
+    vm.push_stack_data_with_type(true.into_stack_data(), PrimitiveType::Bool);
     Ok(1)
 }
 
 pub(in crate::interpreter) fn handle_ld_false(_: &Chunk, vm: &mut Vm) -> Result<usize, VmError> {
-    vm.push_stack_data_with_type(false.into_stack_data(), Type::Bool);
+    vm.push_stack_data_with_type(false.into_stack_data(), PrimitiveType::Bool);
     Ok(1)
 }
