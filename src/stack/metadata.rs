@@ -1,4 +1,5 @@
 use crate::refs::StackRef;
+use crate::types::checker::{Tag, TypeChecker, TypeCheckerCtx};
 use crate::types::VmType;
 use crate::vm::StackDataRef;
 
@@ -14,6 +15,18 @@ impl StackMetadata {
         Self {
             value_type,
             index: StackDataRef(index.0),
+        }
+    }
+
+    pub fn check<'a, 'c>(
+        &'a self,
+        tag: impl Into<Tag>,
+        ctx: &'c mut TypeCheckerCtx,
+    ) -> TypeChecker<'a, 'c> {
+        TypeChecker {
+            tag: tag.into(),
+            vm_type: &self.value_type,
+            ctx,
         }
     }
 }

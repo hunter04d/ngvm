@@ -2,7 +2,7 @@
 
 use super::{BiOpMarker, UOpMarker};
 macro_rules! gen_markers {
-    ($($t: ident),*) => {
+    ($($t: ident),* $(,)?) => {
         $(
         #[derive(Debug)]
         pub struct $t;
@@ -32,16 +32,10 @@ gen_markers! {
     CheckedShr,
     CheckedRotL,
     CheckedRotR,
-    Eq,
-    Ne,
-    Lt,
-    Gt,
-    Le,
-    Ge,
     // logical
     Or,
     Xor,
-    And
+    And,
 }
 
 #[derive(Debug)]

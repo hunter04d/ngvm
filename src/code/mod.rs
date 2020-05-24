@@ -10,6 +10,9 @@ mod chunk;
 
 pub use chunk::Chunk;
 use std::convert::TryInto;
+use crate::model::{ToBytesCtx, Opcode};
+use serde::export::TryFrom;
+use std::option::NoneError;
 
 /// Byte-code of this machine
 /// A wrapper around the raw bytes
@@ -26,15 +29,15 @@ impl Code {
     }
 }
 
-impl From<Vec<model::Opcode>> for Code {
-    fn from(opcodes: Vec<model::Opcode>) -> Self {
-        Self(
-            opcodes
-                .into_iter()
-                .map(|op| op.to_bytes())
-                .flatten()
-                .collect::<Vec<_>>(),
-        )
+impl TryFrom<Vec<model::Opcode>> for Code {
+
+    type Error = NoneError;
+
+    fn try_from(opcodes: Vec<Opcode>) -> Result<Self, Self::Error> {
+        let ctx = ToBytesCtx::new();
+        Ok(Self(
+            ctx.convert(opcodes)?
+        ))
     }
 }
 
@@ -52,16 +55,15 @@ impl Code {
             let consumed = op_fn(&chunk, vm);
             match consumed {
                 Err(e) => {
-                    eprint!("{:?}", e);
+                    eprintln!("VM ERROR HAS HAPPENED: {:?}", e);
                     break;
                 }
-                Ok(count) if count > 0 => {
+                Ok(count)  => {
                     // we consumed in a linear nature
                     vm.ip += count;
                     // NOTE: don't use advance, position might be different
                     chunk.set_offset(vm.ip);
                 }
-                _ => {}
             }
         }
     }

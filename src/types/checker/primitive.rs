@@ -7,9 +7,9 @@ fn report_not_user(t: &TaggedType) -> String {
 }
 
 pub struct PrimitiveTypeChecker<C: HasTypeCheckerCtx> {
-    tag: Tag,
-    t: Option<PrimitiveType>,
-    ctx: C,
+    pub(super) tag: Tag,
+    pub(super) t: Option<PrimitiveType>,
+    pub(super) ctx: C,
 }
 
 impl<C: HasTypeCheckerCtx> PrimitiveTypeChecker<C> {
@@ -63,9 +63,24 @@ impl<C: HasTypeCheckerCtx> PrimitiveTypeChecker<C> {
 
     pub fn integer(self) -> C {
         self.cond(
-            |t| t.is_user(),
+            |t| t.is_integer(),
             |t| format!("<{}>{:?} is not integer", t.tag, t.vm_type),
         )
+    }
+
+    pub fn either(self) -> PrimitiveTypeChecker<PrimitiveEitherTypeChecker<C>> {
+        let ctx = self.ctx;
+        let either = PrimitiveEitherTypeChecker {
+            tag: self.tag.clone(),
+            t: self.t,
+            ctx,
+            error: None,
+        };
+        PrimitiveTypeChecker {
+            tag: self.tag,
+            t: self.t,
+            ctx: either,
+        }
     }
 
     pub fn bool(self) -> C {
@@ -86,6 +101,53 @@ impl<C: HasTypeCheckerCtx> PrimitiveTypeChecker<C> {
             types: vec![(self.tag, self.t), (other_checker.tag, other_checker.t)],
             ctx: other_checker.ctx,
         }
+    }
+}
+
+pub struct PrimitiveEitherTypeChecker<C: HasTypeCheckerCtx> {
+    tag: Tag,
+    t: Option<PrimitiveType>,
+    ctx: C,
+    error: Option<TypeError>,
+}
+
+impl<C: HasTypeCheckerCtx> PrimitiveEitherTypeChecker<C> {
+    pub fn or(self) -> PrimitiveTypeChecker<Self> {
+        let t = if self.error.is_none() { None } else { self.t };
+        PrimitiveTypeChecker {
+            tag: self.tag.clone(),
+            t,
+            ctx: self,
+        }
+    }
+    pub fn and(mut self) -> C {
+        if let Some(e) = self.error {
+            self.ctx.ctx().report(e)
+        }
+        self.ctx
+    }
+
+    pub fn fmt(mut self, format: impl FnOnce(&TypeError, &TaggedType) -> String) -> C {
+        if let (Some(e), Some(t)) = (self.error, self.t) {
+            let tagged = VmType::from(t).tag(self.tag);
+            let format = format(&e, &tagged);
+            self.ctx.ctx().report(TypeError::From(Box::new(e), format));
+        }
+        self.ctx
+    }
+}
+
+impl<C: HasTypeCheckerCtx> HasTypeCheckerCtx for PrimitiveEitherTypeChecker<C> {
+    type Unwrapped = ();
+
+    fn ctx(&mut self) -> &mut TypeCheckerCtx {
+        self.ctx.ctx()
+    }
+
+    fn unwrap(self) -> Self::Unwrapped {}
+
+    fn report(&mut self, e: TypeError) {
+        self.error = Some(e);
     }
 }
 
@@ -356,18 +418,19 @@ impl<'c> PrimitiveOperandsTypeChecker<'c> {
 
     pub fn same(mut self) -> TwoPrimitiveMergedTypesChecker<'c> {
         if let (Some(op1), Some(op2)) = (self.op1, self.op2) {
-             if op1 != op2 {
-                 self.ctx().report(TypeError::TwoNotEqual(
-                     VmType::Primitive(op1).tag(tags::OP1),
-                     VmType::Primitive(op2).tag(tags::OP2)));
-             }
-         };
-         TwoPrimitiveMergedTypesChecker {
-             result: self.ctx.result,
-             op: self.op1,
-             ctx: self.ctx.ctx,
-         }
-     }
+            if op1 != op2 {
+                self.ctx().report(TypeError::TwoNotEqual(
+                    VmType::Primitive(op1).tag(tags::OP1),
+                    VmType::Primitive(op2).tag(tags::OP2),
+                ));
+            }
+        };
+        TwoPrimitiveMergedTypesChecker {
+            result: self.ctx.result,
+            op: self.op1,
+            ctx: self.ctx.ctx,
+        }
+    }
 
     pub fn both_cond(
         self,

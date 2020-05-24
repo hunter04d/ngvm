@@ -5,6 +5,8 @@ authors = ["hunter04d <hunter04d@gmail.com>"]
 edition = "2018"
 
 default-run = "main"
+[profile.release]
+lto = true
 
 [dependencies]
 num-traits = "0.2"

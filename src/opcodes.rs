@@ -43,17 +43,19 @@ pub enum Opcode {
     BNot = 29,
     BBe = 30,
     BXor = 31,
+
+    // logical  ops
     LAnd = 32,
     LOr = 33,
     LNot = 34,
     LXor = 35,
 
-    // Todo: shifts,
+    // shifts,
     Shl = 36,
     Shr = 37,
     RotL = 38,
     RotR = 39,
-    // TODO: comparisons
+    // comparisons
     Ge = 40,
     Gt = 41,
     Le = 42,
@@ -63,7 +65,7 @@ pub enum Opcode {
     // TODO: jump
     /// Jump <offset>
     J = 46,
-    /// Jump <condition> <offset>
+    /// Jump <offset> <condition>
     JC = 47,
     StartScope = 48,
     EndScope = 49,

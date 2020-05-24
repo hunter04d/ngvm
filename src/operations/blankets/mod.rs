@@ -4,7 +4,6 @@ use std::ops;
 use super::markers::*;
 use super::{BiOp, UOp};
 
-pub mod bool;
 pub mod checked;
 pub mod logical;
 pub mod shifts;

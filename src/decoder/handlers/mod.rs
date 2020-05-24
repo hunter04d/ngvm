@@ -4,6 +4,7 @@ use crate::opcodes::Opcode;
 use super::model::{DecoderRef, DecoderRefs};
 use super::tags;
 use super::DecodedOpcode;
+use crate::refs::VmRef;
 
 pub(super) fn decode_u64_ld0(_: &Chunk) -> Option<DecodedOpcode> {
     Some(DecodedOpcode::zero(Opcode::U64Ld0))
@@ -134,19 +135,19 @@ pub(super) fn decode_ld_false(_: &Chunk) -> Option<DecodedOpcode> {
 }
 
 pub(super) fn decode_j(chunk: &Chunk) -> Option<DecodedOpcode> {
-    let offset = chunk.read_ref_stack(0)?;
-    let refs = DecoderRefs::One(DecoderRef::new(offset, tags::OFFSET));
+    let offset = chunk.read_offset()?;
+    let refs = DecoderRefs::One(DecoderRef::offset(offset, tags::OFFSET));
     Some(DecodedOpcode::new(Opcode::J, refs))
 }
 
 pub(super) fn decode_jc(chunk: &Chunk) -> Option<DecodedOpcode> {
-    let offset = chunk.read_ref(0)?;
-    let condition = chunk.read_ref_stack(1)?;
+    let offset = chunk.read_offset()?;
+    let condition = chunk.read_ref_with_offset(0)?;
     let refs = DecoderRefs::Two(
         DecoderRef::offset(offset, tags::OFFSET),
-        DecoderRef::new(condition, tags::CONDITION),
+        DecoderRef::new(VmRef::Stack(condition.into()), tags::CONDITION),
     );
-    Some(DecodedOpcode::new(Opcode::J, refs))
+    Some(DecodedOpcode::new(Opcode::JC, refs))
 }
 
 pub(crate) fn noop(_: &Chunk) -> Option<DecodedOpcode> {

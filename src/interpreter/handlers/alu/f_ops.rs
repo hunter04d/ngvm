@@ -1,13 +1,15 @@
 use crate::code::{Chunk, RefSource};
 use crate::error::VmError;
-use crate::interpreter::handlers::alu::{AluExtensions, TwoStackMetadata};
+use crate::interpreter::handlers::alu::process_u_op;
 use crate::operations::markers::*;
 use crate::operations::{BiOp, BiOpMarker, UOp, UOpMarker};
-use crate::refs::{refs_size, ThreeStackRefs, TwoStackRefs};
-use crate::stack::data::{FromSingle, IntoStackData, StackData};
+use crate::refs::refs_size;
+use crate::stack::data::IntoStackData;
 use crate::types::checker::{HasTypeCheckerCtx, Taggable, TypeCheckerCtx};
 use crate::types::{HasPrimitiveType, PrimitiveType, VmType};
 use crate::vm::{Vm, VmRefSource};
+
+use super::{process_bi_op, AluExtensions};
 
 fn handle_bi_float_op<M: BiOpMarker>(chunk: &Chunk, vm: &mut Vm) -> Result<usize, VmError>
 where
@@ -34,21 +36,6 @@ where
     Ok(1 + refs_size(3))
 }
 
-fn process_bi_op<M, T>(vm: &mut Vm, refs: &ThreeStackRefs) -> Result<(), VmError>
-where
-    M: BiOpMarker,
-    T: BiOp<M> + FromSingle<StackData>,
-    <T as BiOp<M>>::Output: IntoStackData + HasPrimitiveType,
-{
-    let meta = vm.three_stack_metadata(refs)?;
-    let op1 = T::from_single(*vm.stack_data(meta.op1.index)?);
-    let op2 = T::from_single(*vm.stack_data(meta.op2.index)?);
-    let r = op1.invoke(op2);
-    let res_index = meta.result.index;
-    *vm.stack_data_mut(res_index)? = r.into_stack_data();
-    Ok(())
-}
-
 fn handle_u_float_op<M: UOpMarker>(chunk: &Chunk, vm: &mut Vm) -> Result<(), VmError>
 where
     f64: UOp<M>,
@@ -71,20 +58,6 @@ where
             VmType::Primitive(t).no_tag(),
         )),
     }
-}
-
-fn process_u_op<M, T>(vm: &mut Vm, refs: &TwoStackRefs) -> Result<(), VmError>
-where
-    M: UOpMarker,
-    T: UOp<M> + FromSingle<StackData>,
-    <T as UOp<M>>::Output: IntoStackData + HasPrimitiveType,
-{
-    let TwoStackMetadata { result, op } = vm.two_stack_metadata(refs)?;
-    let op = T::from_single(*vm.stack_data(op.index)?);
-    let r = op.invoke();
-    let res_index = result.index;
-    *vm.stack_data_mut(res_index)? = r.into_stack_data();
-    Ok(())
 }
 
 macro_rules! handle_f_ops {

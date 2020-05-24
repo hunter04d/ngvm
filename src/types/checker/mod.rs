@@ -3,7 +3,7 @@ use crate::types::VmType;
 use smallvec::alloc::borrow::Cow;
 
 mod primitive;
-use crate::types::checker::primitive::TwoPrimitiveTypesChecker;
+use crate::types::checker::primitive::{PrimitiveTypeChecker, TwoPrimitiveTypesChecker};
 pub use primitive::ThreePrimitiveTypesChecker;
 
 pub mod tags;
@@ -33,6 +33,10 @@ pub trait HasTypeCheckerCtx: Sized {
     }
     fn get_vm(self) -> Result<Self::Unwrapped, VmError> {
         self.get().map_err(VmError::TypeError)
+    }
+
+    fn report(&mut self, e: TypeError) {
+        self.ctx().report(e);
     }
 }
 
@@ -65,6 +69,20 @@ impl HasTypeCheckerCtx for TypeCheckerCtx {
     }
 
     fn unwrap(self) -> Self::Unwrapped {}
+
+    fn report(&mut self, e: TypeError) {
+        TypeCheckerCtx::report(self, e)
+    }
+}
+
+impl HasTypeCheckerCtx for &mut TypeCheckerCtx {
+    type Unwrapped = ();
+
+    fn ctx(&mut self) -> &mut TypeCheckerCtx {
+        self
+    }
+
+    fn unwrap(self) -> Self::Unwrapped {}
 }
 
 pub type Tag = Cow<'static, str>;
@@ -73,6 +91,12 @@ pub type Tag = Cow<'static, str>;
 pub struct TaggedType {
     pub tag: Tag,
     pub vm_type: VmType,
+}
+
+pub struct TypeChecker<'a, 'c> {
+    pub tag: Tag,
+    pub vm_type: &'a VmType,
+    pub ctx: &'c mut TypeCheckerCtx,
 }
 
 pub struct ThreeTypesChecker<'a, 'c> {
@@ -128,9 +152,25 @@ pub enum TypeError {
     NotEquals(TaggedType, VmType),
     NotOneOf(TaggedType, Vec<VmType>),
     Condition(TaggedType, String),
+    From(Box<TypeError>, String),
     TwoNotEqual(TaggedType, TaggedType),
     ThreeNotEqual(TaggedType, TaggedType, TaggedType),
     AllNotEqual(Vec<TaggedType>),
+}
+
+impl<'a, 'c> TypeChecker<'a, 'c> {
+    pub fn primitive(self) -> PrimitiveTypeChecker<&'c mut TypeCheckerCtx> {
+        let p = self.vm_type.primitive();
+        if p.is_none() {
+            self.ctx
+                .report(TypeError::NotPrimitive(self.vm_type.tag(self.tag.clone())));
+        }
+        PrimitiveTypeChecker {
+            tag: self.tag,
+            t: p,
+            ctx: self.ctx,
+        }
+    }
 }
 
 impl<'a, 'c> ThreeTypesChecker<'a, 'c> {
