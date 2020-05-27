@@ -1,9 +1,10 @@
+use serde::{Deserialize, Serialize};
 use std::mem::size_of;
-
 pub type Ref = usize;
 
 /// Type of the reference to a stack value in bytecode
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Deserialize, Serialize)]
+#[serde(transparent)]
 pub struct StackRef(pub Ref);
 
 impl From<Ref> for StackRef {
@@ -13,7 +14,8 @@ impl From<Ref> for StackRef {
 }
 
 /// Type of the reference to a constant pool value in bytecode
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Deserialize, Serialize)]
+#[serde(transparent)]
 pub struct PoolRef(pub Ref);
 
 impl From<Ref> for PoolRef {
@@ -60,14 +62,14 @@ impl From<PoolRef> for VmRef {
 }
 
 /// 3 reference opcode
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, Deserialize, Serialize)]
 pub struct ThreeStackRefs {
     pub result: StackRef,
     pub op1: StackRef,
     pub op2: StackRef,
 }
 /// 2 reference opcode
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, Deserialize, Serialize)]
 pub struct TwoStackRefs {
     pub result: StackRef,
     pub op: StackRef,

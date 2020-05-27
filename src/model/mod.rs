@@ -1,16 +1,17 @@
 //! This module contains types that represent VM as high level object model.
 
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::convert::TryInto;
 use std::mem::size_of;
 
 use Opcode::*;
 
 use crate::opcodes::Opcode as Nc;
 use crate::refs::{refs_size, PoolRef, Ref, StackRef, ThreeStackRefs, TwoStackRefs};
-use std::collections::HashMap;
-use std::convert::TryInto;
 
 /// Vm opcode represented as Rust enum (size constraints be dammed)
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum Opcode {
     /// Load 0 u64
     Ld0U64,
@@ -117,7 +118,7 @@ impl ToBytesCtx {
     }
 
     // TODO: label transliteration and patching
-    pub(crate) fn convert(mut self, ops: Vec<Opcode>) -> Option<Vec<u8>> {
+    pub(crate) fn convert(mut self, ops: &[Opcode]) -> Option<Vec<u8>> {
         for op in ops {
             let extend = op.to_bytes(&mut self)?;
             self.bytes.extend(extend);

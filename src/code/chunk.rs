@@ -34,20 +34,28 @@ impl<'a> Chunk<'a> {
     }
 
     #[inline]
-    pub(crate) fn read_byte(&self) -> u8 {
-        self.bytes[self.offset]
-    }
-
-    const ERROR_INVALID_OPCODE: &'static str = "FATAL ERROR: Invalid opcode";
-
-    #[allow(dead_code)]
-    pub(crate) fn single_opcode(&self) -> Opcode {
-        Opcode::single(self.read_byte()).expect(Self::ERROR_INVALID_OPCODE)
+    pub(crate) fn read_byte(&self, index: usize) -> Option<u8> {
+        self.bytes.get(self.offset + index).copied()
     }
 
     #[allow(dead_code)]
-    pub(crate) fn opcode(&self, kind: OpcodeKind) -> Opcode {
-        Opcode::from_kind(self.read_byte(), kind).expect(Self::ERROR_INVALID_OPCODE)
+    pub(crate) fn single_opcode(&self) -> Option<Opcode> {
+        Opcode::single(self.read_byte(0)?)
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn opcode(&self, kind: OpcodeKind) -> Option<Opcode> {
+        Opcode::from_kind(self.read_byte(0)?, kind)
+    }
+
+    pub fn full_opcode(&self) -> Option<Opcode> {
+        let first_byte = self.read_byte(0)?;
+        if first_byte != u8::MAX {
+            Opcode::single(first_byte)
+        } else {
+            let second_byte = self.read_byte(1)?;
+            Opcode::double(second_byte)
+        }
     }
 
     pub fn offset(&self) -> usize {

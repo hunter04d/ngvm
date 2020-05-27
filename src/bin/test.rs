@@ -1,16 +1,17 @@
-use ngvm::model::Opcode::*;
-use ngvm::refs::{one, three, PoolRef};
+use std::fs::File;
+
+use flate2::Compression;
+use flate2::write::GzEncoder;
+
+use ngvm::{Code, ConstantPool, Vm};
+use ngvm::error::{VmContextError, VmError};
+use ngvm::model::{self, Opcode::*};
+use ngvm::refs::{one, PoolRef, three};
 use ngvm::types::PrimitiveType::*;
-use ngvm::{Code, ConstantPool, Module, Vm};
-use std::convert::TryInto;
+use serde::Serialize;
 
-fn main() {
-    let pool = ConstantPool::new(vec![U64.into(), 1000u64.into(), 1u64.into()]);
-    // spin up a vm instance
-    println!("{:?}", pool);
-    let mut vm = Vm::with_module(Module::new(pool));
-
-    let code: Code = vec![
+fn fibonacci() -> Vec<model::Opcode> {
+    vec![
         Ld0U64, // 0
         Ld0U64, // 1
         LDType {
@@ -51,8 +52,13 @@ fn main() {
             cond: one(6),
         },
     ]
-    .try_into()
-    .unwrap();
+}
+
+fn run(code: &[model::Opcode], pool: ConstantPool) -> Result<(), VmContextError> {
+    // spin up a vm instance
+    let mut vm = Vm::headless(pool);
+    let code = Code::from_model(code).ok_or(VmError::InvalidBytecode)?;
+
     let decode = code.decode();
     if !decode.is_full {
         panic!("Bad code")
@@ -60,5 +66,30 @@ fn main() {
         decode.print(true);
     }
 
-    code.interpret(&mut vm);
+    code.interpret(&mut vm)
+}
+
+fn main() {
+    let code = fibonacci();
+    let pool = ConstantPool::new(vec![U64.into(), 10u64.into(), 1u64.into()]);
+    let result = run(&code, pool);
+    if let Err(e) = result {
+        println!("{:?}", e);
+    }
+
+    let file = File::create("data/test.yaml").unwrap();
+    serde_yaml::to_writer(file, &code).unwrap();
+
+    let file = File::create("data/test.ngvm").unwrap();
+
+    let df = GzEncoder::new(file, Compression::best());
+    // why are you like so?
+    bincode::serialize_into(df, &code).unwrap();
+    let file = File::create("data/test.json").unwrap();
+    serde_json::to_writer_pretty(file, &code).unwrap();
+
+    let config = ron::ser::PrettyConfig::default().with_extensions(ron::extensions::Extensions::UNWRAP_NEWTYPES);
+    let file = File::create("data/test.ron").unwrap();
+    let mut ser = ron::Serializer::new(file, Some(config), false).unwrap();
+    code.serialize(&mut ser).unwrap();
 }

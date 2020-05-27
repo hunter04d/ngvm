@@ -26,9 +26,17 @@ pub(super) fn handle_wide(chunk: &Chunk, _: &mut Vm) -> Result<usize, VmError> {
     let mut new_chunk = chunk.clone();
     new_chunk.advance(1);
 
-    unimplemented!("Wide opcodes are not supporsed yet (@{})", chunk.offset())
+    unimplemented!(
+        "Wide opcodes are not supported yet (@{}) {}",
+        chunk.offset(),
+        new_chunk.read_byte(0).ok_or(VmError::InvalidBytecode)?
+    )
 }
 
 pub(crate) fn noop(chunk: &Chunk, _vm: &mut Vm) -> Result<usize, VmError> {
-    panic!("a bad opcode detected <{}>", chunk.read_byte());
+    panic!(
+        "a bad opcode detected (@{}){}",
+        chunk.offset(),
+        chunk.read_byte(0).ok_or(VmError::InvalidBytecode)?
+    );
 }

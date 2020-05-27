@@ -1,18 +1,18 @@
+use std::convert::{TryFrom, TryInto};
 use std::mem::size_of;
+use std::option::NoneError;
+
+pub use chunk::Chunk;
 
 use crate::decoder::{DecodedOpcode, HANDLERS as D_HANDLERS};
+use crate::error::VmContextError;
 use crate::interpreter::HANDLERS as I_HANDLERS;
 use crate::model;
+use crate::model::ToBytesCtx;
 use crate::refs::{PoolRef, Ref, StackRef, ThreeStackRefs, TwoStackRefs};
 use crate::Vm;
 
 mod chunk;
-
-use crate::model::{Opcode, ToBytesCtx};
-pub use chunk::Chunk;
-use serde::export::TryFrom;
-use std::convert::TryInto;
-use std::option::NoneError;
 
 /// Byte-code of this machine
 /// A wrapper around the raw bytes
@@ -32,9 +32,15 @@ impl Code {
 impl TryFrom<Vec<model::Opcode>> for Code {
     type Error = NoneError;
 
-    fn try_from(opcodes: Vec<Opcode>) -> Result<Self, Self::Error> {
+    fn try_from(opcodes: Vec<model::Opcode>) -> Result<Self, Self::Error> {
+        Self::from_model(&opcodes).ok_or(NoneError)
+    }
+}
+
+impl Code {
+    pub fn from_model(ops: &[model::Opcode]) -> Option<Code> {
         let ctx = ToBytesCtx::new();
-        Ok(Self(ctx.convert(opcodes)?))
+        Some(Self(ctx.convert(ops)?))
     }
 }
 
@@ -45,15 +51,20 @@ pub struct DecodeResult {
 }
 
 impl Code {
-    pub fn interpret(&self, vm: &mut Vm) {
+    pub fn interpret(&self, vm: &mut Vm) -> Result<(), VmContextError> {
         let mut chunk = Chunk::from_code(self);
         while vm.ip < chunk.bytes.len() {
-            let op_fn = I_HANDLERS[chunk.read_byte() as usize];
+            let byte = chunk.read_byte(0).unwrap();
+            let op_fn = I_HANDLERS[byte as usize];
             let consumed = op_fn(&chunk, vm);
             match consumed {
                 Err(e) => {
                     eprintln!("VM ERROR HAS HAPPENED: {:?}", e);
-                    break;
+                    return Err(VmContextError {
+                        error: e,
+                        location: Some(chunk.offset),
+                        opcode: chunk.full_opcode(),
+                    });
                 }
                 Ok(count) => {
                     // we consumed in a linear nature
@@ -63,13 +74,15 @@ impl Code {
                 }
             }
         }
+        Ok(())
     }
 
     pub fn decode(&self) -> DecodeResult {
         let mut chunk = Chunk::from_code(self);
         let mut opcodes = Vec::new();
         while chunk.offset < self.0.len() {
-            let op_fn = D_HANDLERS[chunk.read_byte() as usize];
+            let byte = chunk.read_byte(0).unwrap();
+            let op_fn = D_HANDLERS[byte as usize];
             let res_opt = op_fn(&chunk);
             match res_opt {
                 None => {
@@ -87,7 +100,7 @@ impl Code {
         }
         DecodeResult {
             opcodes,
-            size: chunk.offset,
+            size: chunk.bytes.len(),
             is_full: true,
         }
     }

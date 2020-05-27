@@ -44,6 +44,11 @@ impl Vm {
         }
     }
 
+    pub fn headless(pool: ConstantPool) -> Self {
+        let module = Module::new(pool);
+        Self::with_module(module)
+    }
+
     pub fn default_growing_stack() -> Self {
         Self {
             stack: Vec::new(),
