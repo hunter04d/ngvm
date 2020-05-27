@@ -14,7 +14,6 @@ fn handle_bi_op(
     processor: impl FnOnce(StackData, StackData) -> StackData,
 ) -> Result<usize, VmError> {
     let rf = &chunk.read_three_vm()?;
-
     let meta = vm.three_stack_metadata(rf)?;
     let mut t_ctx = TypeCheckerCtx::new();
     let _ = meta
@@ -28,10 +27,9 @@ fn handle_bi_op(
         .user()
         .get_vm()?;
 
-    let op1 = *vm.stack_data(meta.op1.index)?;
-    let op2 = *vm.stack_data(meta.op2.index)?;
-    let index = meta.result.index;
-    *vm.stack_data_mut(index)? = processor(op1, op2);
+    let op1 = *vm.single_stack_data(rf.op1)?;
+    let op2 = *vm.single_stack_data(rf.op2)?;
+    *vm.single_stack_data_mut(rf.result)? = processor(op1, op2);
     Ok(1 + refs_size(3))
 }
 
@@ -54,9 +52,8 @@ fn handle_u_op(
         .user()
         .get_vm()?;
 
-    let op = vm.stack_data(meta.op.index)?;
-    let index = meta.result.index;
-    *vm.stack_data_mut(index)? = processor(*op);
+    let op = vm.single_stack_data(rf.op)?;
+    *vm.single_stack_data_mut(rf.result)? = processor(*op);
     Ok(1 + refs_size(3))
 }
 

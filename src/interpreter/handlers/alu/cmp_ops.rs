@@ -78,12 +78,10 @@ fn process_cmp_op<T, F: Fn(Ordering) -> bool>(
 where
     T: FromSingle<StackData> + PartialOrd,
 {
-    let meta = vm.three_stack_metadata(refs)?;
-    let op1 = T::from_single(*vm.stack_data(meta.op1.index)?);
-    let op2 = T::from_single(*vm.stack_data(meta.op2.index)?);
+    let op1 = T::from_single(*vm.single_stack_data(refs.op1)?);
+    let op2 = T::from_single(*vm.single_stack_data(refs.op2)?);
     let r = op1.partial_cmp(&op2).ok_or(VmError::BiOpError)?;
-    let res_index = meta.result.index;
-    *vm.stack_data_mut(res_index)? = to_bool(r).into_stack_data();
+    *vm.single_stack_data_mut(refs.result)? = to_bool(r).into_stack_data();
     Ok(())
 }
 

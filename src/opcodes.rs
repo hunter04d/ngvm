@@ -73,6 +73,10 @@ pub enum Opcode {
     Call = 50, // Call <POOL REF>
     Ret = 51,  // Return
     IsType = 52,
+    /// StartDeref <Ref>
+    StartDeref = 53,
+    /// EndDeref
+    EndDeref = 54,
     // TODO: arrays if have time
 
     //

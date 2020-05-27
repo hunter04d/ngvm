@@ -5,7 +5,7 @@ use std::mem::size_of;
 use Opcode::*;
 
 use crate::opcodes::Opcode as Nc;
-use crate::refs::{PoolRef, Ref, StackRef, ThreeStackRefs, TwoStackRefs, refs_size};
+use crate::refs::{refs_size, PoolRef, Ref, StackRef, ThreeStackRefs, TwoStackRefs};
 use std::collections::HashMap;
 use std::convert::TryInto;
 
@@ -83,14 +83,14 @@ pub enum Opcode {
     Eq(ThreeStackRefs),
     Ne(ThreeStackRefs),
     J {
-        label: usize
+        label: usize,
     },
     JC {
         label: usize,
         cond: StackRef,
     },
     JOffset {
-        offset: usize
+        offset: usize,
     },
     JCOffset {
         offset: usize,
@@ -115,7 +115,6 @@ impl ToBytesCtx {
             bytes: Vec::new(),
         }
     }
-
 
     // TODO: label transliteration and patching
     pub(crate) fn convert(mut self, ops: Vec<Opcode>) -> Option<Vec<u8>> {

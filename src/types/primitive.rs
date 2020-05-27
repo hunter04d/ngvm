@@ -18,11 +18,14 @@ pub enum PrimitiveType {
     F64 = 10,
     Bool = 11,
     Char = 12,
+
+    /// Scope
+    Scope = 32,
     /// Stack frame
     ///
     /// this type uses metadata for its own purpose
     ///
-    /// takes one word
+    /// takes two words - TBD
     ///
     /// ** This type is internal and should not be used for in user code!!! **
     StackFrame = 64,
@@ -80,6 +83,17 @@ impl PrimitiveType {
 
     pub fn is_user(self) -> bool {
         self.is_single() || matches!(self, PrimitiveType::Never)
+    }
+
+    /// Returns the size of the type in StackData
+    pub fn size(self) -> usize {
+        if self.is_single() {
+            1
+        } else if matches!(self, PrimitiveType::Never) {
+            0
+        } else {
+            panic!("No size defined for {:?}", self);
+        }
     }
 }
 impl Default for PrimitiveType {

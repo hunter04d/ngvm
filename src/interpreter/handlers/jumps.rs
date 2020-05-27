@@ -1,6 +1,6 @@
 use crate::code::Chunk;
 use crate::error::VmError;
-use crate::refs::{refs_size, StackRef};
+use crate::refs::refs_size;
 use crate::stack::data::IntoPrimitive;
 use crate::types::checker::{tags, HasTypeCheckerCtx, TypeCheckerCtx};
 use crate::vm::VmRefSource;
@@ -15,8 +15,7 @@ pub(in crate::interpreter) fn handle_j(chunk: &Chunk, vm: &mut Vm) -> Result<usi
 
 pub(in crate::interpreter) fn handle_jc(chunk: &Chunk, vm: &mut Vm) -> Result<usize, VmError> {
     let offset = chunk.read_offset_vm()?;
-    // TODO: new type method
-    let cond = StackRef(chunk.read_ref_with_offset_vm(0)?);
+    let cond = chunk.read_ref_stack_with_offset_vm(0)?;
     let meta = vm.stack_metadata(cond)?;
     let mut t_ctx = TypeCheckerCtx::new();
     let _ = meta
@@ -24,7 +23,7 @@ pub(in crate::interpreter) fn handle_jc(chunk: &Chunk, vm: &mut Vm) -> Result<us
         .primitive()
         .bool()
         .get_vm()?;
-    if vm.stack_data(meta.index)?.into_primitive() {
+    if vm.single_stack_data(cond)?.into_primitive() {
         vm.ip = offset;
         Ok(0)
     } else {

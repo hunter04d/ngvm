@@ -13,21 +13,25 @@ fn main() {
     let code: Code = vec![
         Ld0U64, // 0
         Ld0U64, // 1
-        LDType { // 2
+        LDType {
+            // 2
             type_location: PoolRef(0),
             value_location: PoolRef(2),
         },
-        LDType { // 3
+        LDType {
+            // 3
             type_location: PoolRef(0),
-            value_location: PoolRef(2)
+            value_location: PoolRef(2),
         },
-        LDType { // 4 (100)
+        LDType {
+            // 4 (100)
             type_location: PoolRef(0),
-            value_location: PoolRef(1)
+            value_location: PoolRef(1),
         },
-        LDType { // 5
+        LDType {
+            // 5
             type_location: PoolRef(0),
-            value_location: PoolRef(2)
+            value_location: PoolRef(2),
         },
         LdFalse, // 6
         // TODO: MV instruction
@@ -44,10 +48,11 @@ fn main() {
         TraceStackValue(one(0)),
         JC {
             label: 0,
-            cond: one(6)
+            cond: one(6),
         },
     ]
-    .try_into().unwrap();
+    .try_into()
+    .unwrap();
     let decode = code.decode();
     if !decode.is_full {
         panic!("Bad code")

@@ -29,15 +29,13 @@ where
     // see: https://github.com/rust-lang/rust/issues/52662
     <<T as BiOp<M, O>>::Output as Try>::Ok: IntoStackData + HasPrimitiveType,
 {
-    let meta = vm.three_stack_metadata(refs)?;
-    let op1 = T::from_single(*vm.stack_data(meta.op1.index)?);
-    let op2 = O::from_single(*vm.stack_data(meta.op2.index)?);
+    let op1 = T::from_single(*vm.single_stack_data(refs.op1)?);
+    let op2 = O::from_single(*vm.single_stack_data(refs.op2)?);
     let r = op1
         .invoke(op2)
         .into_result()
         .map_err(|_| VmError::BiOpError)?;
-    let res_index = meta.result.index;
-    *vm.stack_data_mut(res_index)? = r.into_stack_data();
+    *vm.single_stack_data_mut(refs.result)? = r.into_stack_data();
     Ok(())
 }
 
@@ -51,12 +49,9 @@ where
     // see: https://github.com/rust-lang/rust/issues/52662
     <<T as UOp<M>>::Output as Try>::Ok: IntoStackData + HasPrimitiveType,
 {
-    let op = vm.stack_metadata(*op)?;
-    let result = vm.stack_metadata(*result)?;
-    let op = T::from_single(*vm.stack_data(op.index)?);
+    let op = T::from_single(*vm.single_stack_data(*op)?);
     let r = op.invoke().into_result().map_err(|_| VmError::UOpError)?;
-    let res_index = result.index;
-    *vm.stack_data_mut(res_index)? = r.into_stack_data();
+    *vm.single_stack_data_mut(*result)? = r.into_stack_data();
     Ok(())
 }
 
@@ -66,12 +61,10 @@ where
     T: BiOp<M> + FromSingle<StackData>,
     <T as BiOp<M>>::Output: IntoStackData + HasPrimitiveType,
 {
-    let meta = vm.three_stack_metadata(refs)?;
-    let op1 = T::from_single(*vm.stack_data(meta.op1.index)?);
-    let op2 = T::from_single(*vm.stack_data(meta.op2.index)?);
+    let op1 = T::from_single(*vm.single_stack_data(refs.op1)?);
+    let op2 = T::from_single(*vm.single_stack_data(refs.op2)?);
     let r = op1.invoke(op2);
-    let res_index = meta.result.index;
-    *vm.stack_data_mut(res_index)? = r.into_stack_data();
+    *vm.single_stack_data_mut(refs.result)? = r.into_stack_data();
     Ok(())
 }
 
@@ -81,11 +74,9 @@ where
     T: UOp<M> + FromSingle<StackData>,
     <T as UOp<M>>::Output: IntoStackData + HasPrimitiveType,
 {
-    let TwoStackMetadata { result, op } = vm.two_stack_metadata(refs)?;
-    let op = T::from_single(*vm.stack_data(op.index)?);
+    let op = T::from_single(*vm.single_stack_data(refs.op)?);
     let r = op.invoke();
-    let res_index = result.index;
-    *vm.stack_data_mut(res_index)? = r.into_stack_data();
+    *vm.single_stack_data_mut(refs.result)? = r.into_stack_data();
     Ok(())
 }
 

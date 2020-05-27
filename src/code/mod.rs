@@ -8,10 +8,10 @@ use crate::Vm;
 
 mod chunk;
 
+use crate::model::{Opcode, ToBytesCtx};
 pub use chunk::Chunk;
-use std::convert::TryInto;
-use crate::model::{ToBytesCtx, Opcode};
 use serde::export::TryFrom;
+use std::convert::TryInto;
 use std::option::NoneError;
 
 /// Byte-code of this machine
@@ -30,14 +30,11 @@ impl Code {
 }
 
 impl TryFrom<Vec<model::Opcode>> for Code {
-
     type Error = NoneError;
 
     fn try_from(opcodes: Vec<Opcode>) -> Result<Self, Self::Error> {
         let ctx = ToBytesCtx::new();
-        Ok(Self(
-            ctx.convert(opcodes)?
-        ))
+        Ok(Self(ctx.convert(opcodes)?))
     }
 }
 
@@ -58,7 +55,7 @@ impl Code {
                     eprintln!("VM ERROR HAS HAPPENED: {:?}", e);
                     break;
                 }
-                Ok(count)  => {
+                Ok(count) => {
                     // we consumed in a linear nature
                     vm.ip += count;
                     // NOTE: don't use advance, position might be different
