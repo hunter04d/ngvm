@@ -19,8 +19,6 @@ pub enum PrimitiveType {
     Bool = 11,
     Char = 12,
 
-    /// Scope
-    Scope = 32,
     /// Stack frame
     ///
     /// this type uses metadata for its own purpose

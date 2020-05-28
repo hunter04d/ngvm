@@ -8,6 +8,7 @@ use super::stack_tracer::StackTracer;
 pub(in crate::interpreter) mod alu;
 pub(in crate::interpreter) mod jumps;
 pub(in crate::interpreter) mod load;
+pub(in crate::interpreter) mod memory;
 
 /// For debug only
 pub(super) fn handle_trace_stack_value(chunk: &Chunk, vm: &mut Vm) -> Result<usize, VmError> {

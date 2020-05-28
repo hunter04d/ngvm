@@ -70,15 +70,23 @@ pub enum Opcode {
     StartScope = 48,
     EndScope = 49,
     // TODO: call
+    /// Call <Module> <FnRef>
     Call = 50, // Call <POOL REF>
-    Ret = 51,  // Return
-    IsType = 52,
+    Ret = 51, // Return <Value>
     /// StartDeref <Ref>
-    StartDeref = 53,
+    StartDeref = 52,
     /// EndDeref
-    EndDeref = 54,
+    EndDeref = 53,
+    /// TakeRef <Value>
+    TakeRef = 54,
+    /// TakeMut <Value>
+    TakeMut = 55,
     // TODO: arrays if have time
-
+    /// SArrCreate0 <Size> <Type of array>
+    SArrCreate0 = 80,
+    SArrRef = 81,
+    SArrMut = 82,
+    SArrSet = 83,
     //
     TraceStackValue = 254,
     /// Handle wide, not an actually  a valid value for opcode

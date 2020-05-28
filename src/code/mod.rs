@@ -59,7 +59,6 @@ impl Code {
             let consumed = op_fn(&chunk, vm);
             match consumed {
                 Err(e) => {
-                    eprintln!("VM ERROR HAS HAPPENED: {:?}", e);
                     return Err(VmContextError {
                         error: e,
                         location: Some(chunk.offset),

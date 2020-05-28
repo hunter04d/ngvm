@@ -2,19 +2,20 @@ use std::fmt::{self, Debug, Formatter};
 
 use crate::stack::data::{FromSingle, StackData};
 use crate::stack::metadata::StackMetadata;
-use crate::types::{PrimitiveType, VmType};
+use crate::types::{PrimitiveType, VmType, PointedType};
+use std::ops::Deref;
 
 /// Traces the stack value contained in a slice of stack data
 pub struct StackTracer<'a>(pub &'a [StackData], pub &'a StackMetadata);
 
 impl<'a> Debug for StackTracer<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        // TODO: DST tracing
         let stack = self.0;
         let data_0 = stack.get(0).copied();
         let value_type = &self.1.value_type;
         let alt = f.alternate();
         let mut s = f.debug_struct("stack_value");
-        s.field("type", &value_type);
         if alt {
             match value_type {
                 VmType::Primitive(p) => {
@@ -35,12 +36,19 @@ impl<'a> Debug for StackTracer<'a> {
                         PrimitiveType::F64 => Box::new(f64::from_single(data_0.unwrap())),
                         PrimitiveType::Bool => Box::new(bool::from_single(data_0.unwrap())),
                         PrimitiveType::Char => Box::new(char::from_single(data_0.unwrap())),
-                        PrimitiveType::Scope => Box::new("scope"),
                     };
                     s.field("data", &repr);
+                    s.field("type", &value_type);
                 }
-                VmType::PointedType(_p) => {
-                    unreachable!();
+                VmType::PointedType(p) => {
+                    match p.deref() {
+                        PointedType::Arr { .. } => unimplemented!("Arrays are not implemented"),
+                        PointedType::Ref(r) => {
+                            // TODO: add cycle to the type of ref
+                            s.field("data", &usize::from_single(data_0.unwrap()));
+                            s.field("type", &format!("{}", r));
+                        }
+                    }
                 }
             }
         } else {

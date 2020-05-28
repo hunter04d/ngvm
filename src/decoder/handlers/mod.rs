@@ -150,13 +150,49 @@ pub(super) fn decode_jc(chunk: &Chunk) -> Option<DecodedOpcode> {
     Some(DecodedOpcode::new(Opcode::JC, refs))
 }
 
+pub(super) fn decode_start_scope(_: &Chunk) -> Option<DecodedOpcode> {
+    Some(DecodedOpcode::zero(Opcode::StartScope))
+}
+
+pub(super) fn decode_end_scope(_: &Chunk) -> Option<DecodedOpcode> {
+    Some(DecodedOpcode::zero(Opcode::EndScope))
+}
+
+pub(super) fn decode_start_deref(chunk: &Chunk) -> Option<DecodedOpcode> {
+    let rf = chunk.read_ref_stack(0)?;
+    Some(DecodedOpcode::one(
+        Opcode::StartDeref,
+        DecoderRef::new(rf, tags::VALUE),
+    ))
+}
+
+pub(super) fn decode_end_deref(_: &Chunk) -> Option<DecodedOpcode> {
+    Some(DecodedOpcode::zero(Opcode::EndDeref))
+}
+
+pub(super) fn decode_take_ref(chunk: &Chunk) -> Option<DecodedOpcode> {
+    let rf = chunk.read_ref_stack(0)?;
+    Some(DecodedOpcode::one(
+        Opcode::TakeRef,
+        DecoderRef::new(rf, tags::VALUE),
+    ))
+}
+
+pub(super) fn decode_take_mut(chunk: &Chunk) -> Option<DecodedOpcode> {
+    let rf = chunk.read_ref_stack(0)?;
+    Some(DecodedOpcode::one(
+        Opcode::TakeMut,
+        DecoderRef::new(rf, tags::VALUE),
+    ))
+}
+
 pub(crate) fn noop(_: &Chunk) -> Option<DecodedOpcode> {
-    panic!("unknown opcode");
+    None
 }
 
 pub(super) fn decode_debug_stack_value(chunk: &Chunk) -> Option<DecodedOpcode> {
     let stack_ref = chunk.read_ref_stack(0)?;
-    let refs = DecoderRefs::One(DecoderRef::new(stack_ref, "v"));
+    let refs = DecoderRefs::One(DecoderRef::new(stack_ref, tags::VALUE));
     Some(DecodedOpcode::new(Opcode::TraceStackValue, refs))
 }
 

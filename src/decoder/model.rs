@@ -121,12 +121,15 @@ impl DecodedOpcode {
         }
     }
 
-    #[allow(dead_code)]
     pub(crate) fn zero(op_code: Opcode) -> Self {
         Self {
             consumed: op_code.size(),
             op_code,
             refs: DecoderRefs::Zero,
         }
+    }
+
+    pub(crate) fn one(op_code: Opcode, rf: DecoderRef) -> Self {
+        Self::new(op_code, DecoderRefs::One(rf))
     }
 }

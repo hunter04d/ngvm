@@ -3,28 +3,29 @@ use std::collections::HashMap;
 use crate::code::{Chunk, RefSource};
 use crate::error::VmError;
 use crate::refs::{PoolRef, Ref, StackRef, ThreeStackRefs, TwoStackRefs};
+use crate::stack::data::IntoStackData;
 use crate::stack::{data::StackData, metadata::StackMetadata};
-use crate::types::PrimitiveType;
-use crate::vm::lock::ValueLock;
+use crate::types::{PointedType, PrimitiveType, RefKind, RefType};
+use crate::vm::lock::{ValueLock};
 use crate::{ConstantPool, Module};
 
 pub mod lock;
-
 pub struct Vm {
     /// vm stack values
     pub(crate) stack: Vec<StackData>,
     /// vm stack metadata
     pub(crate) stack_metadata: Vec<StackMetadata>,
+
+    /// The current cycle of the vm
+    ///
+    /// Starts at 1. 0 is reserved for static data
+    pub(crate) cycle: usize,
     /// current instruction in the current stack frame
     pub(crate) ip: usize,
 
     /// Index from which all indexing is happening
     pub(crate) last_stack_frame: usize,
 
-    /// The current lifecycle of the vm, starts at one
-    ///
-    /// Zero is reserved for static data segment in the future
-    pub(crate) cycle: usize,
     /// Loaded modules
     pub(crate) modules: HashMap<String, Module>,
 
@@ -89,6 +90,12 @@ impl Vm {
             .ok_or(VmError::BadVmState)
     }
 
+    pub fn stack_metadata_mut(&mut self, index: StackRef) -> Result<&mut StackMetadata, VmError> {
+        self.stack_metadata
+            .get_mut(self.last_stack_frame + index.0)
+            .ok_or(VmError::BadVmState)
+    }
+
     pub fn single_stack_data_mut(&mut self, index: StackRef) -> Result<&mut StackData, VmError> {
         let meta = self
             .stack_metadata
@@ -108,7 +115,7 @@ impl Vm {
         self.stack_metadata.push(StackMetadata {
             value_type: t.into(),
             index: StackDataRef(len),
-            cycle: self.cycle,
+            cycle: self.current_cycle(),
             lock: ValueLock::None,
         });
         self.stack.push(value);
@@ -118,12 +125,54 @@ impl Vm {
         self.push_primitive(Default::default(), t)
     }
 
+    pub fn push_stack_ref(&mut self, index: StackRef, kind: RefKind) -> Result<(), VmError> {
+        let cycle = self.cycle;
+        let meta = self.stack_metadata_mut(index)?;
+        let lock = &mut meta.lock;
+        match lock.add_lock(cycle, kind) {
+            Ok(_) => {
+                let pointer = meta.value_type.clone();
+                let len = self.stack.len();
+                self.stack_metadata.push(StackMetadata {
+                    value_type: PointedType::Ref(RefType {
+                        kind,
+                        pointer
+                    }).into(),
+                    index: StackDataRef(len),
+                    cycle,
+                    lock: ValueLock::None,
+                });
+                self.stack.push(index.0.into_stack_data());
+                Ok(())
+            }
+            Err(e) => Err(VmError::LockError(e, index)),
+        }
+    }
+
     /// Pop the last stack value in its entirety from the stack
     pub fn pop_stack(&mut self) {
-        if let Some(meta) = self.stack_metadata.last() {
+        if let Some(meta) = self.stack_metadata.pop() {
             let size = meta.value_type.size();
             self.stack.truncate(self.stack.len() - size);
         }
+    }
+
+    pub fn push_scope(&mut self) -> Result<(), VmError> {
+        self.cycle = self.cycle.checked_add(1).ok_or(VmError::BadVmState)?;
+        Ok(())
+    }
+
+    pub fn pop_scope(&mut self) -> Result<(), VmError> {
+        if self.cycle == 1 {
+            Err(VmError::BadVmState)
+        } else {
+            self.cycle -= 1;
+            Ok(())
+        }
+    }
+
+    pub fn current_cycle(&self) -> usize {
+        self.cycle
     }
 
     pub fn current_const_pool(&self) -> &ConstantPool {
@@ -136,9 +185,9 @@ impl Default for Vm {
         Self {
             stack: Vec::with_capacity(128),
             stack_metadata: Vec::with_capacity(128),
+            cycle: 1,
             ip: 0,
             last_stack_frame: 0,
-            cycle: 1,
             modules: Default::default(),
             current_module: "".to_string(),
         }

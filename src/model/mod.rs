@@ -98,6 +98,11 @@ pub enum Opcode {
         cond: StackRef,
     },
     Label(usize),
+    StartScope,
+    EndScope,
+    Scope(Vec<Opcode>),
+    TakeRef(StackRef),
+    TakeMut(StackRef),
     TraceStackValue(StackRef),
 }
 
@@ -191,7 +196,6 @@ impl Opcode {
             Lt(v) => with_three_refs(Nc::Lt, v),
             Eq(v) => with_three_refs(Nc::Eq, v),
             Ne(v) => with_three_refs(Nc::Ne, v),
-            TraceStackValue(v) => with_one_ref(Nc::TraceStackValue, v.0),
             J { label } => {
                 let offset = ctx.label_table.get(label);
                 if let Some(offset) = offset {
@@ -218,6 +222,21 @@ impl Opcode {
                 let len = ctx.bytes.len();
                 ctx.label_table.insert(*l, len);
                 Vec::new()
+            }
+            StartScope => single(Nc::StartScope),
+            EndScope => single(Nc::EndScope),
+            TakeRef(r) => with_one_ref(Nc::TakeRef, r.0),
+            TakeMut(r) => with_one_ref(Nc::TakeMut, r.0),
+            TraceStackValue(v) => with_one_ref(Nc::TraceStackValue, v.0),
+            Scope(opcodes) => {
+                let mut result = Vec::new();
+                result.extend_from_slice(&single(Nc::StartScope));
+
+                for op in opcodes {
+                    result.extend_from_slice(&op.to_bytes(ctx)?);
+                }
+                result.extend_from_slice(&single(Nc::EndScope));
+                result
             }
         };
         Some(b)

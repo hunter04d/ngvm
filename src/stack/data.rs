@@ -37,7 +37,7 @@ macro_rules! derive_from_single_for_types {
     };
 }
 
-derive_from_single_for_types!(u8, u16, u32, u64, i8, i16, i32, i64, f32, f64);
+derive_from_single_for_types!(u8, u16, u32, u64, i8, i16, i32, i64, f32, f64, usize);
 
 impl FromSingle<StackData> for bool {
     #[inline]
@@ -74,7 +74,7 @@ macro_rules! derive_from_primitive_for_types {
     };
 }
 
-derive_from_primitive_for_types!(u8, u16, u32, u64, i8, i16, i32, i64, f32, f64);
+derive_from_primitive_for_types!(u8, u16, u32, u64, i8, i16, i32, i64, f32, f64, usize);
 
 impl<T> IntoStackData for T
 where

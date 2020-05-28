@@ -1,15 +1,10 @@
-use std::fs::File;
-
-use flate2::Compression;
-use flate2::write::GzEncoder;
-
-use ngvm::{Code, ConstantPool, Vm};
 use ngvm::error::{VmContextError, VmError};
 use ngvm::model::{self, Opcode::*};
-use ngvm::refs::{one, PoolRef, three};
+use ngvm::refs::{one, three, PoolRef};
 use ngvm::types::PrimitiveType::*;
-use serde::Serialize;
+use ngvm::{Code, ConstantPool, Vm};
 
+#[allow(dead_code)]
 fn fibonacci() -> Vec<model::Opcode> {
     vec![
         Ld0U64, // 0
@@ -54,6 +49,26 @@ fn fibonacci() -> Vec<model::Opcode> {
     ]
 }
 
+fn ref_test() -> Vec<model::Opcode> {
+    vec! {
+        Ld0U64,
+        Scope(vec![
+            TakeRef(one(0)),
+            Scope(vec![
+                TakeRef(one(1)),
+                Scope(vec![
+                    TakeMut(one(2)),
+                    TraceStackValue(one(3)),
+                ])
+            ])
+        ]),
+        Scope(vec![
+            TakeMut(one(0)),
+            TraceStackValue(one(1))
+        ])
+    }
+}
+
 fn run(code: &[model::Opcode], pool: ConstantPool) -> Result<(), VmContextError> {
     // spin up a vm instance
     let mut vm = Vm::headless(pool);
@@ -70,26 +85,11 @@ fn run(code: &[model::Opcode], pool: ConstantPool) -> Result<(), VmContextError>
 }
 
 fn main() {
-    let code = fibonacci();
+    // let code = fibonacci();
+    let code = ref_test();
     let pool = ConstantPool::new(vec![U64.into(), 10u64.into(), 1u64.into()]);
     let result = run(&code, pool);
     if let Err(e) = result {
         println!("{:?}", e);
     }
-
-    let file = File::create("data/test.yaml").unwrap();
-    serde_yaml::to_writer(file, &code).unwrap();
-
-    let file = File::create("data/test.ngvm").unwrap();
-
-    let df = GzEncoder::new(file, Compression::best());
-    // why are you like so?
-    bincode::serialize_into(df, &code).unwrap();
-    let file = File::create("data/test.json").unwrap();
-    serde_json::to_writer_pretty(file, &code).unwrap();
-
-    let config = ron::ser::PrettyConfig::default().with_extensions(ron::extensions::Extensions::UNWRAP_NEWTYPES);
-    let file = File::create("data/test.ron").unwrap();
-    let mut ser = ron::Serializer::new(file, Some(config), false).unwrap();
-    code.serialize(&mut ser).unwrap();
 }
