@@ -89,6 +89,9 @@ pub enum Opcode {
     SArrRef = 81,
     SArrMut = 82,
     SArrSet = 83,
+
+    /// SArrXCG <Mut Array Ref> <Index> <Value/OldValue>
+    SArrXCG = 84,
     //
     TraceStackValue = 254,
     /// Handle wide, not an actually  a valid value for opcode

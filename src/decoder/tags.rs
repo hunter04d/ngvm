@@ -8,3 +8,7 @@ pub const OP: &str = "op";
 
 pub const OFFSET: &str = "*";
 pub const CONDITION: &str = "cond";
+
+pub const S_ARR_REF: &str = "&s_arr";
+pub const S_ARR_MUT: &str = "&mut s_arr";
+pub const IDX: &str = "index";

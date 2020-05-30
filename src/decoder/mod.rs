@@ -69,7 +69,7 @@ pub(crate) static HANDLERS: [fn(&Chunk) -> Option<DecodedOpcode>; 256] = [
     noop,                     // 57
     noop,                     // 58
     noop,                     // 59
-    decode_mv,                     // 60
+    decode_mv,                // 60
     noop,                     // 61
     noop,                     // 62
     noop,                     // 63
@@ -89,11 +89,11 @@ pub(crate) static HANDLERS: [fn(&Chunk) -> Option<DecodedOpcode>; 256] = [
     noop,                     // 77
     noop,                     // 78
     noop,                     // 79
-    noop,                     // 80
-    noop,                     // 81
-    noop,                     // 82
-    noop,                     // 83
-    noop,                     // 84
+    decode_s_arr_create_0,    // 80
+    decode_s_arr_ref,         // 81
+    decode_s_arr_mut,         // 82
+    decode_s_arr_set,         // 83
+    decode_s_arr_xcg,         // 84
     noop,                     // 85
     noop,                     // 86
     noop,                     // 87

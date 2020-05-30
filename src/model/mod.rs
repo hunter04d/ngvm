@@ -243,10 +243,7 @@ impl Opcode {
             }
             StartDeref(r) => with_one_ref(Nc::StartDeref, r.0),
             EndDeref => single(Nc::EndDeref),
-            Mv(r, o) => with_two_refs(Nc::Mv, &TwoStackRefs {
-                result: *r,
-                op: *o
-            })
+            Mv(r, o) => with_two_refs(Nc::Mv, &TwoStackRefs { result: *r, op: *o }),
         };
         Some(b)
     }

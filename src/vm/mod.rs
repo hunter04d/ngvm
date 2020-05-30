@@ -21,7 +21,7 @@ pub struct Vm {
     /// vm stack metadata
     pub(crate) stack_metadata: Vec<StackMeta>,
 
-    pub(crate) transient_refs: Vec<TransientMeta>,
+    pub(crate) transient_refs: HashMap<ValueLocation, TransientMeta>,
 
     pub(crate) derefs: Vec<VmDeref>,
     /// The current cycle of the vm
@@ -192,7 +192,6 @@ impl Vm {
         Ok(())
     }
 
-
     fn unlock_by_ref(&mut self, rf: LocatedRef) -> Result<(), VmError> {
         let vm_cycle = self.cycle;
         match rf {
@@ -207,7 +206,7 @@ impl Vm {
             LocatedRef::Transient(index) => {
                 let value_meta = self
                     .transient_refs
-                    .get_mut(index)
+                    .get_mut(&index)
                     .ok_or(VmError::BadVmState)?;
                 if let Some(c) = value_meta.lock.lock_cycle() {
                     if c == vm_cycle {
@@ -221,7 +220,7 @@ impl Vm {
         Ok(())
     }
 
-pub    fn switch_lock_cycle(&mut self, rf: LocatedRef) -> Result<(), VmError> {
+    pub fn switch_lock_cycle(&mut self, rf: LocatedRef) -> Result<(), VmError> {
         let vm_cycle = self.cycle;
         match rf {
             LocatedRef::Stack(index) => {
@@ -229,25 +228,23 @@ pub    fn switch_lock_cycle(&mut self, rf: LocatedRef) -> Result<(), VmError> {
                 if let ValueLock::Mut(_) = value_meta.lock {
                     value_meta.lock = ValueLock::Mut(vm_cycle);
                     Ok(())
-                }
-                else {
+                } else {
                     Err(VmError::BadVmState)
                 }
             }
             LocatedRef::Transient(index) => {
                 let value_meta = self
                     .transient_refs
-                    .get_mut(index)
+                    .get_mut(&index)
                     .ok_or(VmError::BadVmState)?;
                 if let ValueLock::Mut(_) = value_meta.lock {
-                   value_meta.lock = ValueLock::Mut(vm_cycle);
+                    value_meta.lock = ValueLock::Mut(vm_cycle);
                     Ok(())
                 } else {
                     Err(VmError::BadVmState)
                 }
             }
         }
-
     }
 
     pub fn push_scope(&mut self) -> Result<(), VmError> {
@@ -295,20 +292,14 @@ pub    fn switch_lock_cycle(&mut self, rf: LocatedRef) -> Result<(), VmError> {
                         let until = from + pointer_size;
                         self.stack.splice(from..until, deref_data);
                     }
-                    LocatedRef::Transient(index) => {
-                        let location = &self
-                            .transient_refs
-                            .get(index)
-                            .ok_or(VmError::BadVmState)?
-                            .location;
-                        match location {
-                            ValueLocation::Stack(index) => {
-                                let from = *index;
-                                let until = from + pointer_size;
-                                self.stack.splice(from..until, deref_data);
-                            }
+                    LocatedRef::Transient(index) => match index {
+                        ValueLocation::Stack(index) => {
+                            let from = index;
+                            let until = from + pointer_size;
+                            self.stack.splice(from..until, deref_data);
                         }
-                    }
+                        ValueLocation::Heap(_) => unimplemented!(),
+                    },
                 }
             }
             self.pop_stack()?;
@@ -345,15 +336,16 @@ impl Default for Vm {
             last_stack_frame: 0,
             modules: Default::default(),
             current_module: "".to_string(),
-            transient_refs: Vec::new(),
+            transient_refs: HashMap::new(),
             derefs: Vec::new(),
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
 pub enum ValueLocation {
     Stack(usize),
+    Heap(*const ()),
 }
 
 #[derive(Debug)]

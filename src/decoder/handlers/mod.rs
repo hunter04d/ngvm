@@ -4,7 +4,7 @@ use crate::opcodes::Opcode;
 use super::model::{DecoderRef, DecoderRefs};
 use super::tags;
 use super::DecodedOpcode;
-use crate::code::refs::CodeRef;
+use crate::code::refs::{CodeRef, PoolRef};
 
 pub(super) fn decode_u64_ld0(_: &Chunk) -> Option<DecodedOpcode> {
     Some(DecodedOpcode::zero(Opcode::U64Ld0))
@@ -185,6 +185,60 @@ pub(super) fn decode_take_mut(chunk: &Chunk) -> Option<DecodedOpcode> {
         Opcode::TakeMut,
         DecoderRef::new(rf, tags::VALUE),
     ))
+}
+
+pub(super) fn decode_s_arr_create_0(chunk: &Chunk) -> Option<DecodedOpcode> {
+    let size = chunk.read_offset()?;
+    let pr = PoolRef(chunk.read_ref_with_offset(0)?);
+    let refs = DecoderRefs::Two(
+        DecoderRef::offset(size, "size"),
+        DecoderRef::new(pr, tags::TYPE),
+    );
+    Some(DecodedOpcode::new(Opcode::SArrCreate0, refs))
+}
+
+pub(super) fn decode_s_arr_ref(chunk: &Chunk) -> Option<DecodedOpcode> {
+    let arr = chunk.read_ref_stack(0)?;
+    let index = chunk.read_ref_stack(1)?;
+    let refs = DecoderRefs::Two(
+        DecoderRef::new(arr, tags::S_ARR_REF),
+        DecoderRef::new(index, tags::IDX),
+    );
+    Some(DecodedOpcode::new(Opcode::SArrRef, refs))
+}
+
+pub(super) fn decode_s_arr_mut(chunk: &Chunk) -> Option<DecodedOpcode> {
+    let arr = chunk.read_ref_stack(0)?;
+    let index = chunk.read_ref_stack(1)?;
+    let refs = DecoderRefs::Two(
+        DecoderRef::new(arr, tags::S_ARR_MUT),
+        DecoderRef::new(index, tags::IDX),
+    );
+    Some(DecodedOpcode::new(Opcode::SArrMut, refs))
+}
+
+pub(super) fn decode_s_arr_set(chunk: &Chunk) -> Option<DecodedOpcode> {
+    let arr = chunk.read_ref_stack(0)?;
+    let index = chunk.read_ref_stack(1)?;
+    let value = chunk.read_ref_stack(2)?;
+    let refs = DecoderRefs::Three(
+        DecoderRef::new(arr, tags::S_ARR_MUT),
+        DecoderRef::new(index, tags::IDX),
+        DecoderRef::new(value, tags::VALUE),
+    );
+    Some(DecodedOpcode::new(Opcode::SArrMut, refs))
+}
+
+pub(super) fn decode_s_arr_xcg(chunk: &Chunk) -> Option<DecodedOpcode> {
+    let arr = chunk.read_ref_stack(0)?;
+    let index = chunk.read_ref_stack(1)?;
+    let value = chunk.read_ref_stack(2)?;
+    let refs = DecoderRefs::Three(
+        DecoderRef::new(arr, tags::S_ARR_MUT),
+        DecoderRef::new(index, tags::IDX),
+        DecoderRef::new(value, tags::VALUE),
+    );
+    Some(DecodedOpcode::new(Opcode::SArrMut, refs))
 }
 
 pub(crate) fn noop(_: &Chunk) -> Option<DecodedOpcode> {

@@ -1,7 +1,9 @@
+use crate::vm::ValueLocation;
+
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
 pub enum LocatedRef {
     Stack(usize),
-    Transient(usize),
+    Transient(ValueLocation),
 }
 
 pub(super) mod code {

@@ -73,13 +73,14 @@ pub(in crate::interpreter) fn handle_start_deref(
             vm.push_deref(&v, t, r_kind, rf)
         }
         LocatedRef::Transient(index) => {
-            let meta = vm.transient_refs.get(index).ok_or(VmError::BadVmState)?;
-            match meta.location {
+            let meta = vm.transient_refs.get(&index).ok_or(VmError::BadVmState)?;
+            match index {
                 ValueLocation::Stack(index) => {
                     let v = vm.stack_data(StackRef(index))?.to_vec();
                     let t = meta.value_type.clone();
                     vm.push_deref(&v, t, r_kind, rf)
                 }
+                ValueLocation::Heap(_) => unimplemented!(),
             }
         }
     }

@@ -2,7 +2,7 @@ use crate::types::checker::{Tag, TypeChecker, TypeCheckerCtx};
 use crate::types::VmType;
 use crate::vm::lock::{DerefLock, ValueLock};
 use crate::vm::refs::LocatedRef;
-use crate::vm::{StackDataRef, ValueLocation};
+use crate::vm::StackDataRef;
 
 #[derive(Debug)]
 pub struct StackMeta {
@@ -53,9 +53,9 @@ impl Meta for StackMeta {
 #[derive(Debug)]
 pub struct TransientMeta {
     pub value_type: VmType,
-    pub location: ValueLocation,
     pub root_object: LocatedRef,
     pub lock: ValueLock,
+    pub was_moved: bool,
 }
 
 impl Meta for TransientMeta {

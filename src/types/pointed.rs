@@ -1,6 +1,7 @@
 use super::VmType;
 use crate::stack::data::{IntoPrimitive, StackData};
 use crate::vm::refs::LocatedRef;
+use crate::vm::ValueLocation;
 use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, PartialEq, Clone)]
@@ -54,8 +55,9 @@ pub enum RefKind {
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
 pub enum RefLocation {
     Stack,
-    Transient,
     Heap,
+    TransientOnStack,
+    TransientOnHeap,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -67,16 +69,12 @@ pub struct RefType {
 
 impl RefType {
     pub fn locate(&self, ref_value: &StackData) -> LocatedRef {
+        let index: usize = ref_value.into_primitive();
         match self.points_to {
-            RefLocation::Stack => {
-                let index: usize = ref_value.into_primitive();
-                LocatedRef::Stack(index)
-            }
-            RefLocation::Transient => {
-                let index: usize = ref_value.into_primitive();
-                LocatedRef::Transient(index)
-            }
+            RefLocation::Stack => LocatedRef::Stack(index),
             RefLocation::Heap => unimplemented!(),
+            RefLocation::TransientOnStack => LocatedRef::Transient(ValueLocation::Stack(index)),
+            RefLocation::TransientOnHeap => unreachable!(),
         }
     }
 

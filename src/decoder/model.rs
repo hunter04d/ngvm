@@ -67,6 +67,7 @@ pub enum DecoderRefs {
     One(DecoderRef),
     Two(DecoderRef, DecoderRef),
     Three(DecoderRef, DecoderRef, DecoderRef),
+    Four(DecoderRef, DecoderRef, DecoderRef, DecoderRef),
 }
 
 impl DecoderRefs {
@@ -76,6 +77,7 @@ impl DecoderRefs {
             DecoderRefs::One(_) => 1,
             DecoderRefs::Two(_, _) => 2,
             DecoderRefs::Three(_, _, _) => 3,
+            DecoderRefs::Four(_, _, _, _) => 4,
         }
     }
 
@@ -96,6 +98,12 @@ impl DecoderRefs {
                 res.extend(r2.code_ref.to_bytes());
                 res.extend(r3.code_ref.to_bytes());
             }
+            DecoderRefs::Four(r1, r2, r3, r4) => {
+                res.extend(r1.code_ref.to_bytes());
+                res.extend(r2.code_ref.to_bytes());
+                res.extend(r3.code_ref.to_bytes());
+                res.extend(r4.code_ref.to_bytes());
+            }
         }
         res
     }
@@ -108,6 +116,7 @@ impl Display for DecoderRefs {
             DecoderRefs::One(r) => write!(f, "{}", r),
             DecoderRefs::Two(r1, r2) => write!(f, "{} {}", r1, r2),
             DecoderRefs::Three(r1, r2, r3) => write!(f, "{} {} {}", r1, r2, r3),
+            DecoderRefs::Four(r1, r2, r3, r4) => write!(f, "{} {} {} {}", r1, r2, r3, r4),
         }
     }
 }

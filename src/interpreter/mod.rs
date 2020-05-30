@@ -73,7 +73,7 @@ pub(crate) static HANDLERS: [IntHandler; 256] = [
     noop,                     // 57
     noop,                     // 58
     noop,                     // 59
-    handle_mv,                     // 60
+    handle_mv,                // 60
     noop,                     // 61
     noop,                     // 62
     noop,                     // 63

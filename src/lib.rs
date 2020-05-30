@@ -20,7 +20,7 @@ mod pool;
 pub mod primitives;
 mod stack;
 pub mod types;
-mod vm;
+pub mod vm;
 
 pub struct Module {
     /// Blob of constants
