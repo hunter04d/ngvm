@@ -1,11 +1,11 @@
 use std::ops::Try;
 use std::option::NoneError;
 
+use crate::code::refs::{ThreeStackRefs, TwoStackRefs};
 use crate::error::VmError;
+use crate::meta::StackMeta;
 use crate::operations::{BiOp, BiOpMarker, UOp, UOpMarker};
-use crate::refs::{ThreeStackRefs, TwoStackRefs};
 use crate::stack::data::{FromSingle, IntoStackData, StackData};
-use crate::stack::metadata::StackMetadata;
 use crate::types::checker::{ThreeTypesChecker, TwoTypesChecker, TypeCheckerCtx};
 use crate::types::HasPrimitiveType;
 use crate::vm::Vm;
@@ -81,14 +81,14 @@ where
 }
 
 struct ThreeStackMetadata<'a> {
-    result: &'a StackMetadata,
-    op1: &'a StackMetadata,
-    op2: &'a StackMetadata,
+    result: &'a StackMeta,
+    op1: &'a StackMeta,
+    op2: &'a StackMeta,
 }
 
 struct TwoStackMetadata<'a> {
-    result: &'a StackMetadata,
-    op: &'a StackMetadata,
+    result: &'a StackMeta,
+    op: &'a StackMeta,
 }
 
 impl<'a> ThreeStackMetadata<'a> {

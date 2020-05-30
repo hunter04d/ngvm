@@ -1,8 +1,10 @@
-use crate::code::Chunk;
+use crate::code::refs::StackRef;
+use crate::code::{refs::refs_size, Chunk};
 use crate::error::VmError;
-use crate::refs::refs_size;
 use crate::types::RefKind;
-use crate::vm::VmRefSource;
+use crate::vm::lock::DerefLock;
+use crate::vm::refs::LocatedRef;
+use crate::vm::{ValueLocation, VmRefSource};
 use crate::Vm;
 
 pub(in crate::interpreter) fn handle_start_scope(_: &Chunk, vm: &mut Vm) -> Result<usize, VmError> {
@@ -17,7 +19,7 @@ pub(in crate::interpreter) fn handle_end_scope(_: &Chunk, vm: &mut Vm) -> Result
         if meta.cycle < current_cycle {
             break;
         }
-        vm.pop_stack();
+        vm.pop_stack()?;
     }
     vm.pop_scope()?;
     Ok(1)
@@ -26,12 +28,14 @@ pub(in crate::interpreter) fn handle_end_scope(_: &Chunk, vm: &mut Vm) -> Result
 fn handle_take_lock(chunk: &Chunk, vm: &mut Vm, kind: RefKind) -> Result<usize, VmError> {
     let rf = chunk.read_ref_stack_vm(0)?;
     let meta = vm.stack_metadata(rf)?;
-    if vm.cycle <= meta.cycle {
-        return Err(VmError::SameCycleRef(kind, rf));
+    if meta.deref != DerefLock::None {
+        Err(VmError::RefToTemp(kind, rf))
+    } else if vm.cycle <= meta.cycle {
+        Err(VmError::SameCycleRef(kind, rf))
+    } else {
+        vm.push_stack_ref(rf, kind)?;
+        Ok(1 + refs_size(1))
     }
-    vm.push_stack_ref(rf, kind)?;
-
-    Ok(1 + refs_size(1))
 }
 pub(in crate::interpreter) fn handle_take_ref(
     chunk: &Chunk,
@@ -45,4 +49,44 @@ pub(in crate::interpreter) fn handle_take_mut(
     vm: &mut Vm,
 ) -> Result<usize, VmError> {
     handle_take_lock(chunk, vm, RefKind::Mut)
+}
+
+pub(in crate::interpreter) fn handle_start_deref(
+    chunk: &Chunk,
+    vm: &mut Vm,
+) -> Result<usize, VmError> {
+    let rf = chunk.read_ref_stack_vm(0)?;
+    let cycle = vm.current_cycle();
+    let (located_ref, r) = vm.locate_ref(rf)?;
+    let r_kind = r.kind;
+    let meta = vm.stack_metadata_mut(rf)?;
+
+    if matches!(r_kind, RefKind::Mut) {
+        meta.lock
+            .add_lock(cycle, RefKind::Mut)
+            .map_err(|e| VmError::LockError(e, rf))?;
+    }
+    match located_ref {
+        LocatedRef::Stack(index) => {
+            let t = vm.stack_metadata(StackRef(index))?.value_type.clone();
+            let v = vm.stack_data(StackRef(index))?.to_vec();
+            vm.push_deref(&v, t, r_kind, rf)
+        }
+        LocatedRef::Transient(index) => {
+            let meta = vm.transient_refs.get(index).ok_or(VmError::BadVmState)?;
+            match meta.location {
+                ValueLocation::Stack(index) => {
+                    let v = vm.stack_data(StackRef(index))?.to_vec();
+                    let t = meta.value_type.clone();
+                    vm.push_deref(&v, t, r_kind, rf)
+                }
+            }
+        }
+    }
+    Ok(1 + refs_size(1))
+}
+
+pub(in crate::interpreter) fn handle_end_deref(_: &Chunk, vm: &mut Vm) -> Result<usize, VmError> {
+    vm.pop_deref()?;
+    Ok(1)
 }

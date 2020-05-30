@@ -1,6 +1,5 @@
-use crate::code::Chunk;
+use crate::code::{refs::refs_size, Chunk};
 use crate::error::VmError;
-use crate::refs::refs_size;
 use crate::stack::data::IntoStackData;
 use crate::types::PrimitiveType;
 use crate::vm::{Vm, VmRefSource};

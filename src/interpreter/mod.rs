@@ -65,8 +65,8 @@ pub(crate) static HANDLERS: [IntHandler; 256] = [
     handle_end_scope,         // 49
     noop,                     // 50
     noop,                     // 51
-    noop,                     // 52
-    noop,                     // 53
+    handle_start_deref,       // 52
+    handle_end_deref,         // 53
     handle_take_ref,          // 54
     handle_take_mut,          // 55
     noop,                     // 56

@@ -1,5 +1,5 @@
+use crate::code::refs::{refs_size, CodeRef};
 use crate::opcodes::Opcode;
-use crate::refs::{refs_size, VmRef};
 use std::borrow::Cow;
 use std::fmt::{self, Display, Formatter};
 
@@ -20,38 +20,38 @@ pub struct DecoderRef {
     /// Common tags can be found in [super::tags](tags module)
     pub tag: Cow<'static, str>,
     /// Reference to value somewhere in the vm
-    pub vm_ref: VmRef,
+    pub code_ref: CodeRef,
 }
 
 impl DecoderRef {
-    pub fn new_with_no_tag(vm_ref: impl Into<VmRef>) -> Self {
+    pub fn new_with_no_tag(code_ref: impl Into<CodeRef>) -> Self {
         Self {
             tag: "".into(),
-            vm_ref: vm_ref.into(),
+            code_ref: code_ref.into(),
         }
     }
 
-    pub fn new(vm_ref: impl Into<VmRef>, tag: impl Into<Cow<'static, str>>) -> Self {
+    pub fn new(vm_ref: impl Into<CodeRef>, tag: impl Into<Cow<'static, str>>) -> Self {
         Self {
             tag: tag.into(),
-            vm_ref: vm_ref.into(),
+            code_ref: vm_ref.into(),
         }
     }
 
     pub fn offset(r: usize, tag: impl Into<Cow<'static, str>>) -> Self {
         Self {
             tag: tag.into(),
-            vm_ref: VmRef::Offset(r),
+            code_ref: CodeRef::Offset(r),
         }
     }
 }
 
 impl Display for DecoderRef {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let (symbol, value) = match self.vm_ref {
-            VmRef::Stack(r) => ("@", r.0),
-            VmRef::Pool(r) => ("$", r.0),
-            VmRef::Offset(r) => ("*", r),
+        let (symbol, value) = match self.code_ref {
+            CodeRef::Stack(r) => ("@", r.0),
+            CodeRef::Pool(r) => ("$", r.0),
+            CodeRef::Offset(r) => ("*", r),
         };
         f.write_str(symbol)?;
         if self.tag.is_empty() {
@@ -85,16 +85,16 @@ impl DecoderRefs {
         match self {
             DecoderRefs::Zero => {}
             DecoderRefs::One(r) => {
-                res.extend(r.vm_ref.to_bytes());
+                res.extend(r.code_ref.to_bytes());
             }
             DecoderRefs::Two(r1, r2) => {
-                res.extend(r1.vm_ref.to_bytes());
-                res.extend(r2.vm_ref.to_bytes());
+                res.extend(r1.code_ref.to_bytes());
+                res.extend(r2.code_ref.to_bytes());
             }
             DecoderRefs::Three(r1, r2, r3) => {
-                res.extend(r1.vm_ref.to_bytes());
-                res.extend(r2.vm_ref.to_bytes());
-                res.extend(r3.vm_ref.to_bytes());
+                res.extend(r1.code_ref.to_bytes());
+                res.extend(r2.code_ref.to_bytes());
+                res.extend(r3.code_ref.to_bytes());
             }
         }
         res

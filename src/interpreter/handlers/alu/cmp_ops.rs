@@ -1,9 +1,9 @@
 use std::cmp::Ordering;
 
+use crate::code::refs::{refs_size, ThreeStackRefs};
 use crate::code::Chunk;
 use crate::error::VmError;
 use crate::interpreter::handlers::alu::AluExtensions;
-use crate::refs::{refs_size, ThreeStackRefs};
 use crate::stack::data::{FromSingle, IntoStackData, StackData};
 use crate::types::checker::{HasTypeCheckerCtx, Taggable, TypeCheckerCtx};
 use crate::types::{PrimitiveType, VmType};

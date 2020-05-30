@@ -7,8 +7,8 @@ use std::mem::size_of;
 
 use Opcode::*;
 
+use crate::code::refs::*;
 use crate::opcodes::Opcode as Nc;
-use crate::refs::{refs_size, PoolRef, Ref, StackRef, ThreeStackRefs, TwoStackRefs};
 
 /// Vm opcode represented as Rust enum (size constraints be dammed)
 #[derive(Debug, Serialize, Deserialize)]
@@ -103,6 +103,8 @@ pub enum Opcode {
     Scope(Vec<Opcode>),
     TakeRef(StackRef),
     TakeMut(StackRef),
+    StartDeref(StackRef),
+    EndDeref,
     TraceStackValue(StackRef),
 }
 
@@ -238,6 +240,8 @@ impl Opcode {
                 result.extend_from_slice(&single(Nc::EndScope));
                 result
             }
+            StartDeref(r) => with_one_ref(Nc::StartDeref, r.0),
+            EndDeref => single(Nc::EndDeref),
         };
         Some(b)
     }

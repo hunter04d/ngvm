@@ -1,9 +1,8 @@
+use ngvm::code::refs::*;
 use ngvm::error::{VmContextError, VmError};
 use ngvm::model::{self, Opcode::*};
-use ngvm::refs::{one, three, PoolRef};
 use ngvm::types::PrimitiveType::*;
 use ngvm::{Code, ConstantPool, Vm};
-
 #[allow(dead_code)]
 fn fibonacci() -> Vec<model::Opcode> {
     vec![
@@ -41,32 +40,47 @@ fn fibonacci() -> Vec<model::Opcode> {
         UAdd(three(3, 3, 5)),
         // if @3 <= @4
         Le(three(6, 3, 4)),
-        TraceStackValue(one(0)),
+        TraceStackValue(s(0)),
         JC {
             label: 0,
-            cond: one(6),
+            cond: s(6),
         },
     ]
 }
 
+#[allow(dead_code)]
 fn ref_test() -> Vec<model::Opcode> {
-    vec! {
+    vec![
         Ld0U64,
         Scope(vec![
-            TakeRef(one(0)),
+            TakeRef(s(0)),
             Scope(vec![
-                TakeRef(one(1)),
-                Scope(vec![
-                    TakeMut(one(2)),
-                    TraceStackValue(one(3)),
-                ])
-            ])
+                TakeRef(s(1)),
+                Scope(vec![TakeMut(s(2)), TraceStackValue(s(3))]),
+            ]),
         ]),
+        Scope(vec![TakeMut(s(0)), TraceStackValue(s(1))]),
+    ]
+}
+
+#[allow(dead_code)]
+fn test_deref() -> Vec<model::Opcode> {
+    vec![
+        Ld0U64,
         Scope(vec![
-            TakeMut(one(0)),
-            TraceStackValue(one(1))
-        ])
-    }
+            TakeMut(s(0)),
+            // 2
+            LDType {
+                type_location: p(0),
+                value_location: p(1),
+            },
+            // 3
+            StartDeref(s(1)),
+            UAdd(three(3, 3, 2)),
+            EndDeref
+        ]),
+        TraceStackValue(s(0))
+    ]
 }
 
 fn run(code: &[model::Opcode], pool: ConstantPool) -> Result<(), VmContextError> {
@@ -86,7 +100,7 @@ fn run(code: &[model::Opcode], pool: ConstantPool) -> Result<(), VmContextError>
 
 fn main() {
     // let code = fibonacci();
-    let code = ref_test();
+    let code = test_deref();
     let pool = ConstantPool::new(vec![U64.into(), 10u64.into(), 1u64.into()]);
     let result = run(&code, pool);
     if let Err(e) = result {

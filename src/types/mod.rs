@@ -1,11 +1,9 @@
-use std::convert::Into;
+pub use pointed::*;
+pub use primitive::*;
 
 pub mod checker;
+mod pointed;
 mod primitive;
-pub use primitive::{HasPrimitiveType, PrimitiveType};
-use std::fmt::Display;
-use smallvec::alloc::fmt::Formatter;
-use std::fmt;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum VmType {
@@ -26,9 +24,9 @@ impl VmType {
         }
     }
 
-    pub fn pointed(self) -> Option<PointedType> {
+    pub fn pointed(&self) -> Option<&PointedType> {
         if let VmType::PointedType(b) = self {
-            Some(*b)
+            Some(b.as_ref())
         } else {
             None
         }
@@ -38,6 +36,16 @@ impl VmType {
         match self {
             VmType::Primitive(p) => p.size(),
             VmType::PointedType(p) => p.size(),
+        }
+    }
+
+    pub fn is_copy(&self) -> bool {
+        match self {
+            VmType::Primitive(_) => true,
+            VmType::PointedType(p) => match p.as_ref() {
+                PointedType::Arr { .. } => false,
+                PointedType::Ref(r) => r.is_copy(),
+            },
         }
     }
 }
@@ -51,81 +59,6 @@ impl From<PrimitiveType> for VmType {
 impl From<PointedType> for VmType {
     fn from(obj: PointedType) -> Self {
         VmType::PointedType(Box::new(obj))
-    }
-}
-
-#[repr(u8)]
-#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
-pub enum RefKind {
-    /// Mutable reference
-    Mut,
-    /// Immutable reference
-    Ref,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct RefType {
-    pub kind: RefKind,
-    pub pointer: VmType,
-}
-
-impl Display for RefType {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", match self.kind {
-            RefKind::Mut => "&mut",
-            RefKind::Ref => "&",
-        })?;
-        match &self.pointer {
-            VmType::Primitive(p) => {
-                write!(f, "{:?}", p)
-            },
-            VmType::PointedType(p) => {
-                match p.as_ref() {
-                    PointedType::Arr { len, pointer } => write!(f, "[{:?};{}]", pointer, len),
-                    PointedType::Ref(r) =>{
-                        write!(f, "({})", r)
-                    } ,
-                }
-            },
-        }
-    }
-
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum PointedType {
-    Arr { len: usize, pointer: VmType },
-    Ref(RefType),
-}
-
-impl PointedType {
-    pub fn arr(pointer: impl Into<VmType>, len: usize) -> Self {
-        PointedType::Arr {
-            len,
-            pointer: pointer.into(),
-        }
-    }
-
-    pub fn reference(pointer: impl Into<VmType>, kind: RefKind) -> Self {
-        PointedType::Ref(RefType {
-            kind,
-            pointer: pointer.into()
-        })
-    }
-
-    pub fn ref_reference(pointer: impl Into<VmType>) -> Self {
-        Self::reference(pointer, RefKind::Ref)
-    }
-
-    pub fn mut_reference(pointer: impl Into<VmType>) -> Self {
-        Self::reference(pointer, RefKind::Mut)
-    }
-
-    pub fn size(&self) -> usize {
-        match self {
-            PointedType::Arr { len, pointer } => len * pointer.size(),
-            PointedType::Ref { .. } => 1,
-        }
     }
 }
 

@@ -25,39 +25,39 @@ impl From<Ref> for PoolRef {
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
-pub enum VmRef {
+pub enum CodeRef {
     Stack(StackRef),
     Pool(PoolRef),
     Offset(usize),
 }
 
-impl VmRef {
+impl CodeRef {
     pub fn ref_value(self) -> Option<Ref> {
         match self {
-            VmRef::Stack(r) => Some(r.0),
-            VmRef::Pool(r) => Some(r.0),
-            VmRef::Offset(_) => None,
+            CodeRef::Stack(r) => Some(r.0),
+            CodeRef::Pool(r) => Some(r.0),
+            CodeRef::Offset(_) => None,
         }
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
         match self {
-            VmRef::Stack(r) => Vec::from(r.0.to_le_bytes()),
-            VmRef::Pool(r) => Vec::from(r.0.to_le_bytes()),
-            VmRef::Offset(r) => Vec::from(r.to_le_bytes()),
+            CodeRef::Stack(r) => Vec::from(r.0.to_le_bytes()),
+            CodeRef::Pool(r) => Vec::from(r.0.to_le_bytes()),
+            CodeRef::Offset(r) => Vec::from(r.to_le_bytes()),
         }
     }
 }
 
-impl From<StackRef> for VmRef {
+impl From<StackRef> for CodeRef {
     fn from(obj: StackRef) -> Self {
-        VmRef::Stack(obj)
+        CodeRef::Stack(obj)
     }
 }
 
-impl From<PoolRef> for VmRef {
+impl From<PoolRef> for CodeRef {
     fn from(obj: PoolRef) -> Self {
-        VmRef::Pool(obj)
+        CodeRef::Pool(obj)
     }
 }
 
@@ -92,10 +92,14 @@ pub const fn two(result: usize, op: usize) -> TwoStackRefs {
     }
 }
 /// 1 reference opcode constructor
-pub const fn one(r: usize) -> StackRef {
+pub const fn s(r: usize) -> StackRef {
     StackRef(r)
 }
 
+/// 1 reference to the constant pool constructor
+pub const fn p(r: usize) -> PoolRef {
+    PoolRef(r)
+}
 /// Return the amount of bytes `n_refs` takes in the bytecode
 pub const fn refs_size(n_refs: usize) -> usize {
     n_refs * size_of::<StackRef>()

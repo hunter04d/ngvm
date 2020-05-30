@@ -1,5 +1,5 @@
+use crate::code::refs::StackRef;
 use crate::opcodes::Opcode;
-use crate::refs::StackRef;
 use crate::types::checker::{TaggedType, TypeError};
 use crate::types::RefKind;
 use crate::vm::lock::LockError;
@@ -23,9 +23,13 @@ pub enum VmError {
     #[error("Type error: {0:?}")]
     TypeError(Vec<TypeError>),
     #[error(
-        "Attempt to take the reference of kind {0:?} in the same vm cycle as the object @{1:?}"
+        "Attempt to take a reference of kind {:?} in the same vm cycle as the object @{}", .0, (.1).0
     )]
     SameCycleRef(RefKind, StackRef),
+    #[error(
+        "Attempt to take a {:?} reference to a temporary @{}", .0, (.1).0
+    )]
+    RefToTemp(RefKind, StackRef),
 
     #[error("{0} (@{1:?})")]
     LockError(LockError, StackRef),

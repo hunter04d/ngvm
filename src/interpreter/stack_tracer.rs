@@ -1,12 +1,12 @@
 use std::fmt::{self, Debug, Formatter};
 
+use crate::meta::StackMeta;
 use crate::stack::data::{FromSingle, StackData};
-use crate::stack::metadata::StackMetadata;
-use crate::types::{PrimitiveType, VmType, PointedType};
+use crate::types::{PointedType, PrimitiveType, VmType};
 use std::ops::Deref;
 
 /// Traces the stack value contained in a slice of stack data
-pub struct StackTracer<'a>(pub &'a [StackData], pub &'a StackMetadata);
+pub struct StackTracer<'a>(pub &'a [StackData], pub &'a StackMeta);
 
 impl<'a> Debug for StackTracer<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {

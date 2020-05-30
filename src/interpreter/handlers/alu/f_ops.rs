@@ -3,13 +3,13 @@ use crate::error::VmError;
 use crate::interpreter::handlers::alu::process_u_op;
 use crate::operations::markers::*;
 use crate::operations::{BiOp, BiOpMarker, UOp, UOpMarker};
-use crate::refs::refs_size;
 use crate::stack::data::IntoStackData;
 use crate::types::checker::{HasTypeCheckerCtx, Taggable, TypeCheckerCtx};
 use crate::types::{HasPrimitiveType, PrimitiveType, VmType};
 use crate::vm::{Vm, VmRefSource};
 
 use super::{process_bi_op, AluExtensions};
+use crate::code::refs::refs_size;
 
 fn handle_bi_float_op<M: BiOpMarker>(chunk: &Chunk, vm: &mut Vm) -> Result<usize, VmError>
 where

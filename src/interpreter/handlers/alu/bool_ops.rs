@@ -1,7 +1,7 @@
 use super::AluExtensions;
+use crate::code::refs::refs_size;
 use crate::code::Chunk;
 use crate::error::VmError;
-use crate::refs::refs_size;
 use crate::stack::data::{FromPrimitive, FromSingle, IntoStackData, StackData};
 use crate::types::checker::{HasTypeCheckerCtx, TypeCheckerCtx};
 use crate::types::PrimitiveType;

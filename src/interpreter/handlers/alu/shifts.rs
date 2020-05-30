@@ -1,12 +1,11 @@
 use std::ops::Try;
 use std::option::NoneError;
 
-use crate::code::Chunk;
+use crate::code::{refs::refs_size, Chunk};
 use crate::error::VmError;
 use crate::interpreter::handlers::alu::{process_fallible_bi_op, AluExtensions};
 use crate::operations::markers::*;
 use crate::operations::{BiOp, BiOpMarker};
-use crate::refs::refs_size;
 use crate::types::checker::{HasTypeCheckerCtx, Taggable, TypeCheckerCtx};
 use crate::types::{PrimitiveType, VmType};
 use crate::vm::{Vm, VmRefSource};

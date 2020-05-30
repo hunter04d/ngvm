@@ -5,22 +5,21 @@
 use std::collections::HashMap;
 
 pub use code::Code;
-pub use constant::{Constant, ConstantPool};
+pub use pool::{Constant, ConstantPool};
 pub use vm::Vm;
 
+pub mod code;
 pub mod decoder;
 pub mod error;
 pub mod interpreter;
+pub mod meta;
 pub mod model;
 pub mod opcodes;
 pub mod operations;
+mod pool;
 pub mod primitives;
-pub mod refs;
-pub mod types;
-
-mod code;
-mod constant;
 mod stack;
+pub mod types;
 mod vm;
 
 pub struct Module {

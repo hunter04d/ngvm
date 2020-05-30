@@ -9,6 +9,35 @@ pub enum ValueLock {
     Mut(usize),
 }
 
+impl Default for ValueLock {
+    fn default() -> Self {
+        ValueLock::None
+    }
+}
+
+#[repr(u8)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
+pub enum DerefLock {
+    None,
+    Ref,
+    Mut,
+}
+
+impl Default for DerefLock {
+    fn default() -> Self {
+        DerefLock::None
+    }
+}
+
+impl From<RefKind> for DerefLock {
+    fn from(obj: RefKind) -> Self {
+        match obj {
+            RefKind::Ref => DerefLock::Ref,
+            RefKind::Mut => DerefLock::Mut,
+        }
+    }
+}
+
 #[derive(Debug, Error)]
 pub enum LockError {
     #[error("Attempted to acquire a mut lock on a value, but value is already locked as ref")]
@@ -36,54 +65,59 @@ impl ValueLock {
         }
     }
 
-    pub fn if_effectively_locked(&self, current_cycle: usize) -> bool {
-        !matches!(self.effective_lock(current_cycle), ValueLock::None)
+    pub fn is_locked(&self) -> bool {
+        !matches!(self, ValueLock::None)
     }
 
-    pub fn can_be_ref_locked(&self, current_cycle: usize) -> bool {
-        let effective = self.effective_lock(current_cycle);
-        match effective {
+    pub fn can_be_ref_locked(&self) -> bool {
+        match self {
             ValueLock::None => true,
             ValueLock::Ref(_) => true,
             ValueLock::Mut(_) => false,
         }
     }
 
-    pub fn can_be_mut_locked(&self, current_cycle: usize) -> bool {
-        let effective = self.effective_lock(current_cycle);
-        match effective {
+    pub fn can_be_mut_locked(&self) -> bool {
+        match self {
             ValueLock::None => true,
             ValueLock::Ref(_) => false,
             ValueLock::Mut(_) => false,
         }
     }
 
-    pub fn can_be_locked(&self, current_cycle: usize, ref_kind: RefKind) -> bool {
+    pub fn can_be_locked(&self, ref_kind: RefKind) -> bool {
         match ref_kind {
-            RefKind::Mut => self.can_be_mut_locked(current_cycle),
-            RefKind::Ref => self.can_be_ref_locked(current_cycle),
+            RefKind::Mut => self.can_be_mut_locked(),
+            RefKind::Ref => self.can_be_ref_locked(),
+        }
+    }
+
+    pub fn add_mut_lock(&mut self, current_cycle: usize) -> Result<(), LockError> {
+        match self {
+            ValueLock::None => {
+                *self = ValueLock::Mut(current_cycle);
+                Ok(())
+            }
+            ValueLock::Ref(_) => Err(LockError::MutLockButRefLocked),
+            ValueLock::Mut(_) => Err(LockError::MutLockButMutLocked),
+        }
+    }
+
+    pub fn add_ref_lock(&mut self, current_cycle: usize) -> Result<(), LockError> {
+        match self {
+            ValueLock::None => {
+                *self = ValueLock::Ref(current_cycle);
+                Ok(())
+            }
+            ValueLock::Ref(_) => Ok(()),
+            ValueLock::Mut(_) => Err(LockError::RefLockButMutLocked),
         }
     }
 
     pub fn add_lock(&mut self, current_cycle: usize, ref_kind: RefKind) -> Result<(), LockError> {
-        let effective = self.effective_lock(current_cycle);
         match ref_kind {
-            RefKind::Mut => match effective {
-                ValueLock::None => {
-                    *self = ValueLock::Mut(current_cycle);
-                    Ok(())
-                }
-                ValueLock::Ref(_) => Err(LockError::MutLockButRefLocked),
-                ValueLock::Mut(_) => Err(LockError::MutLockButMutLocked),
-            },
-            RefKind::Ref => match effective {
-                ValueLock::None => {
-                    *self = ValueLock::Ref(current_cycle);
-                    Ok(())
-                }
-                ValueLock::Ref(_) => Ok(()),
-                ValueLock::Mut(_) => Err(LockError::RefLockButMutLocked),
-            },
+            RefKind::Mut => self.add_mut_lock(current_cycle),
+            RefKind::Ref => self.add_ref_lock(current_cycle),
         }
     }
 }

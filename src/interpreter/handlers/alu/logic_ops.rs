@@ -1,8 +1,7 @@
-use crate::code::Chunk;
+use crate::code::{refs::refs_size, Chunk};
 use crate::error::VmError;
 use crate::operations::markers::{And, Not, Or, Xor};
 use crate::operations::{BiOp, BiOpMarker};
-use crate::refs::refs_size;
 use crate::types::checker::{HasTypeCheckerCtx, Taggable, TypeCheckerCtx};
 use crate::types::{PrimitiveType, VmType};
 use crate::vm::VmRefSource;

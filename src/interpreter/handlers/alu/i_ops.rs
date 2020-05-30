@@ -1,11 +1,10 @@
 use std::ops::Try;
 use std::option::NoneError;
 
-use crate::code::Chunk;
+use crate::code::{refs::refs_size, Chunk};
 use crate::error::VmError;
 use crate::operations::markers::*;
 use crate::operations::{BiOp, BiOpMarker, UOp, UOpMarker};
-use crate::refs::refs_size;
 use crate::types::{PrimitiveType, VmType};
 use crate::vm::{Vm, VmRefSource};
 

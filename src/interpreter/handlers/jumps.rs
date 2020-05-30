@@ -1,6 +1,6 @@
-use crate::code::Chunk;
+use crate::code::{refs::refs_size, Chunk};
 use crate::error::VmError;
-use crate::refs::refs_size;
+use crate::meta::Meta;
 use crate::stack::data::IntoPrimitive;
 use crate::types::checker::{tags, HasTypeCheckerCtx, TypeCheckerCtx};
 use crate::vm::VmRefSource;

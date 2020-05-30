@@ -4,7 +4,7 @@ use crate::opcodes::Opcode;
 use super::model::{DecoderRef, DecoderRefs};
 use super::tags;
 use super::DecodedOpcode;
-use crate::refs::VmRef;
+use crate::code::refs::CodeRef;
 
 pub(super) fn decode_u64_ld0(_: &Chunk) -> Option<DecodedOpcode> {
     Some(DecodedOpcode::zero(Opcode::U64Ld0))
@@ -145,7 +145,7 @@ pub(super) fn decode_jc(chunk: &Chunk) -> Option<DecodedOpcode> {
     let condition = chunk.read_ref_with_offset(0)?;
     let refs = DecoderRefs::Two(
         DecoderRef::offset(offset, tags::OFFSET),
-        DecoderRef::new(VmRef::Stack(condition.into()), tags::CONDITION),
+        DecoderRef::new(CodeRef::Stack(condition.into()), tags::CONDITION),
     );
     Some(DecodedOpcode::new(Opcode::JC, refs))
 }

@@ -9,10 +9,11 @@ use crate::error::VmContextError;
 use crate::interpreter::HANDLERS as I_HANDLERS;
 use crate::model;
 use crate::model::ToBytesCtx;
-use crate::refs::{PoolRef, Ref, StackRef, ThreeStackRefs, TwoStackRefs};
 use crate::Vm;
+use refs::{PoolRef, Ref, StackRef, ThreeStackRefs, TwoStackRefs};
 
 mod chunk;
+pub mod refs;
 
 /// Byte-code of this machine
 /// A wrapper around the raw bytes

@@ -1,21 +1,29 @@
 use std::collections::HashMap;
 
-use crate::code::{Chunk, RefSource};
+use crate::code::refs::StackRef;
 use crate::error::VmError;
-use crate::refs::{PoolRef, Ref, StackRef, ThreeStackRefs, TwoStackRefs};
+use crate::meta::{StackMeta, TransientMeta};
 use crate::stack::data::IntoStackData;
-use crate::stack::{data::StackData, metadata::StackMetadata};
-use crate::types::{PointedType, PrimitiveType, RefKind, RefType};
-use crate::vm::lock::{ValueLock};
+use crate::stack::data::StackData;
+use crate::types::{PointedType, PrimitiveType, RefKind, RefLocation, RefType, VmType};
 use crate::{ConstantPool, Module};
+use lock::ValueLock;
+use refs::LocatedRef;
 
 pub mod lock;
+pub mod refs;
+
+pub use refs::code::VmRefSource;
+
 pub struct Vm {
     /// vm stack values
     pub(crate) stack: Vec<StackData>,
     /// vm stack metadata
-    pub(crate) stack_metadata: Vec<StackMetadata>,
+    pub(crate) stack_metadata: Vec<StackMeta>,
 
+    pub(crate) transient_refs: Vec<TransientMeta>,
+
+    pub(crate) derefs: Vec<VmDeref>,
     /// The current cycle of the vm
     ///
     /// Starts at 1. 0 is reserved for static data
@@ -69,28 +77,20 @@ impl Vm {
         }
     }
 
-    pub fn stack_data(&self, meta: &StackMetadata) -> Result<&[StackData], VmError> {
-        let index = meta.index.0;
-        let size = meta.value_type.size();
-        let from = self.last_stack_frame + index;
-        let until = from + size;
-        if until > self.stack.len() {
-            Err(VmError::BadVmState)
-        } else {
-            Ok(&self.stack[from..until])
-        }
-    }
-    pub fn stack_data_opt(&self, index: StackDataRef) -> Option<&StackData> {
-        self.stack.get(self.last_stack_frame + index.0)
+    pub fn stack_data(&self, index: StackRef) -> Result<&[StackData], VmError> {
+        let meta = self.stack_metadata(index)?;
+        let from = meta.index.0;
+        let until = from + meta.value_type.size();
+        Ok(&self.stack[from..until])
     }
 
-    pub fn stack_metadata(&self, index: StackRef) -> Result<&StackMetadata, VmError> {
+    pub fn stack_metadata(&self, index: StackRef) -> Result<&StackMeta, VmError> {
         self.stack_metadata
             .get(self.last_stack_frame + index.0)
             .ok_or(VmError::BadVmState)
     }
 
-    pub fn stack_metadata_mut(&mut self, index: StackRef) -> Result<&mut StackMetadata, VmError> {
+    pub fn stack_metadata_mut(&mut self, index: StackRef) -> Result<&mut StackMeta, VmError> {
         self.stack_metadata
             .get_mut(self.last_stack_frame + index.0)
             .ok_or(VmError::BadVmState)
@@ -110,14 +110,19 @@ impl Vm {
         }
     }
 
+    pub fn stack_data_mut(&mut self, index: StackRef) -> Result<&mut [StackData], VmError> {
+        let meta = self.stack_metadata(index)?;
+        let from = meta.index.0;
+        let until = from + meta.value_type.size();
+        Ok(&mut self.stack[from..until])
+    }
+
     pub fn push_primitive(&mut self, value: StackData, t: PrimitiveType) {
         let len = self.stack.len();
-        self.stack_metadata.push(StackMetadata {
-            value_type: t.into(),
-            index: StackDataRef(len),
-            cycle: self.current_cycle(),
-            lock: ValueLock::None,
-        });
+        let cycle = self.current_cycle();
+        let meta = StackMeta::new(t, StackDataRef(len), cycle);
+
+        self.stack_metadata.push(meta);
         self.stack.push(value);
     }
 
@@ -126,22 +131,16 @@ impl Vm {
     }
 
     pub fn push_stack_ref(&mut self, index: StackRef, kind: RefKind) -> Result<(), VmError> {
-        let cycle = self.cycle;
+        let cycle = self.current_cycle();
         let meta = self.stack_metadata_mut(index)?;
         let lock = &mut meta.lock;
         match lock.add_lock(cycle, kind) {
-            Ok(_) => {
+            Ok(()) => {
                 let pointer = meta.value_type.clone();
                 let len = self.stack.len();
-                self.stack_metadata.push(StackMetadata {
-                    value_type: PointedType::Ref(RefType {
-                        kind,
-                        pointer
-                    }).into(),
-                    index: StackDataRef(len),
-                    cycle,
-                    lock: ValueLock::None,
-                });
+                let ref_type = PointedType::reference(pointer, kind, RefLocation::Stack);
+                let ref_meta = StackMeta::new(ref_type, StackDataRef(len), cycle);
+                self.stack_metadata.push(ref_meta);
                 self.stack.push(index.0.into_stack_data());
                 Ok(())
             }
@@ -150,11 +149,54 @@ impl Vm {
     }
 
     /// Pop the last stack value in its entirety from the stack
-    pub fn pop_stack(&mut self) {
+    pub fn pop_stack(&mut self) -> Result<(), VmError> {
         if let Some(meta) = self.stack_metadata.pop() {
             let size = meta.value_type.size();
+            match meta.value_type {
+                VmType::Primitive(_) => {}
+                VmType::PointedType(p) => match *p {
+                    PointedType::Arr { .. } => unimplemented!("Arrays are not implemented"),
+                    PointedType::Ref(r) => {
+                        let ref_value = self
+                            .stack
+                            .get(self.last_stack_frame + meta.index.0)
+                            .ok_or(VmError::BadVmState)?;
+                        let located_ref = r.locate(ref_value);
+                        self.unlock_by_ref(located_ref)?;
+                    }
+                },
+            }
             self.stack.truncate(self.stack.len() - size);
         }
+        Ok(())
+    }
+
+    fn unlock_by_ref(&mut self, rf: LocatedRef) -> Result<(), VmError> {
+        let vm_cycle = self.cycle;
+        match rf {
+            LocatedRef::Stack(index) => {
+                let value_meta = self.stack_metadata_mut(StackRef(index))?;
+                if let Some(c) = value_meta.lock.lock_cycle() {
+                    if c == vm_cycle {
+                        value_meta.lock = ValueLock::None;
+                    }
+                }
+            }
+            LocatedRef::Transient(index) => {
+                let value_meta = self
+                    .transient_refs
+                    .get_mut(index)
+                    .ok_or(VmError::BadVmState)?;
+                if let Some(c) = value_meta.lock.lock_cycle() {
+                    if c == vm_cycle {
+                        value_meta.lock = ValueLock::None;
+                        let root = value_meta.root_object;
+                        self.unlock_by_ref(root)?;
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 
     pub fn push_scope(&mut self) -> Result<(), VmError> {
@@ -168,6 +210,68 @@ impl Vm {
         } else {
             self.cycle -= 1;
             Ok(())
+        }
+    }
+
+    pub fn stack_meta_of_type(&self, t: VmType) -> StackMeta {
+        let cycle = self.current_cycle();
+        let len = self.stack.len();
+        StackMeta::new(t, StackDataRef(len), cycle)
+    }
+
+    pub fn push_deref(&mut self, value: &[StackData], t: VmType, kind: RefKind, rf: StackRef) {
+        let len = self.stack_metadata.len();
+        let mut meta = self.stack_meta_of_type(t);
+        meta.deref = kind.into();
+        self.stack_metadata.push(meta);
+        self.stack.extend_from_slice(value);
+        self.derefs.push(VmDeref {
+            rf,
+            deref: StackRef(len),
+        });
+    }
+
+    pub fn pop_deref(&mut self) -> Result<(), VmError> {
+        if let Some(d) = self.derefs.pop() {
+            let (lr, rt) = self.locate_ref(d.rf)?;
+            let pointer_size = rt.pointer.size();
+            if rt.kind == RefKind::Mut {
+                self.stack_metadata_mut(d.rf)?.lock = ValueLock::None;
+                let deref_data = self.stack_data(d.deref)?.to_vec();
+                match lr {
+                    LocatedRef::Stack(index) => {
+                        let from = index;
+                        let until = from + pointer_size;
+                        self.stack.splice(from..until, deref_data);
+                    }
+                    LocatedRef::Transient(index) => {
+                        let location = &self
+                            .transient_refs
+                            .get(index)
+                            .ok_or(VmError::BadVmState)?
+                            .location;
+                        match location {
+                            ValueLocation::Stack(index) => {
+                                let from = *index;
+                                let until = from + pointer_size;
+                                self.stack.splice(from..until, deref_data);
+                            }
+                        }
+                    }
+                }
+            }
+            self.pop_stack()?;
+        }
+        Ok(())
+    }
+
+    pub fn locate_ref(&self, index: StackRef) -> Result<(LocatedRef, &RefType), VmError> {
+        let meta = self.stack_metadata(index)?;
+        if let Some(PointedType::Ref(r)) = meta.value_type.pointed() {
+            let data = self.single_stack_data(index)?;
+            Ok((r.locate(data), r))
+        } else {
+            Err(VmError::BadVmState)
         }
     }
 
@@ -190,65 +294,19 @@ impl Default for Vm {
             last_stack_frame: 0,
             modules: Default::default(),
             current_module: "".to_string(),
+            transient_refs: Vec::new(),
+            derefs: Vec::new(),
         }
     }
 }
 
-pub trait VmRefSource {
-    type VmError: std::error::Error;
-
-    fn read_from_offset_vm(&self, offset: usize, size: usize) -> Result<&[u8], Self::VmError>;
-
-    fn read_ref_vm(&self, index: usize) -> Result<Ref, Self::VmError>;
-
-    fn read_ref_with_offset_vm(&self, index: usize) -> Result<Ref, Self::VmError>;
-
-    fn read_offset_vm(&self) -> Result<usize, Self::VmError>;
-
-    fn read_two_vm(&self) -> Result<TwoStackRefs, Self::VmError> {
-        let result = StackRef(self.read_ref_vm(0)?);
-        let op = StackRef(self.read_ref_vm(1)?);
-        Ok(TwoStackRefs { result, op })
-    }
-
-    fn read_three_vm(&self) -> Result<ThreeStackRefs, Self::VmError> {
-        let result = StackRef(self.read_ref_vm(0)?);
-        let op1 = StackRef(self.read_ref_vm(1)?);
-        let op2 = StackRef(self.read_ref_vm(2)?);
-        Ok(ThreeStackRefs { result, op1, op2 })
-    }
-
-    fn read_ref_pool_vm(&self, index: usize) -> Result<PoolRef, Self::VmError> {
-        Ok(PoolRef(self.read_ref_vm(index)?))
-    }
-
-    fn read_ref_stack_vm(&self, index: usize) -> Result<StackRef, Self::VmError> {
-        Ok(StackRef(self.read_ref_vm(index)?))
-    }
-
-    fn read_ref_stack_with_offset_vm(&self, index: usize) -> Result<StackRef, Self::VmError> {
-        self.read_ref_with_offset_vm(index).map(StackRef)
-    }
+#[derive(Debug)]
+pub enum ValueLocation {
+    Stack(usize),
 }
 
-impl VmRefSource for Chunk<'_> {
-    type VmError = VmError;
-
-    fn read_from_offset_vm(&self, offset: usize, size: usize) -> Result<&[u8], Self::VmError> {
-        self.read_from_offset(offset, size)
-            .ok_or(VmError::InvalidBytecode)
-    }
-
-    fn read_ref_vm(&self, index: usize) -> Result<Ref, Self::VmError> {
-        self.read_ref(index).ok_or(VmError::InvalidBytecode)
-    }
-
-    fn read_ref_with_offset_vm(&self, index: usize) -> Result<Ref, Self::VmError> {
-        self.read_ref_with_offset(index)
-            .ok_or(VmError::InvalidBytecode)
-    }
-
-    fn read_offset_vm(&self) -> Result<usize, Self::VmError> {
-        self.read_offset().ok_or(VmError::InvalidBytecode)
-    }
+#[derive(Debug)]
+pub struct VmDeref {
+    pub rf: StackRef,
+    pub deref: StackRef,
 }
