@@ -33,6 +33,8 @@ pub enum VmError {
 
     #[error("{0} (@{1:?})")]
     LockError(LockError, StackRef),
+    #[error("Use of moved value @{}", (.0).0)]
+    UseOfMovedValue(StackRef),
 }
 
 #[derive(Debug)]

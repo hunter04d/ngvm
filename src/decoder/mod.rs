@@ -69,7 +69,7 @@ pub(crate) static HANDLERS: [fn(&Chunk) -> Option<DecodedOpcode>; 256] = [
     noop,                     // 57
     noop,                     // 58
     noop,                     // 59
-    noop,                     // 60
+    decode_mv,                     // 60
     noop,                     // 61
     noop,                     // 62
     noop,                     // 63

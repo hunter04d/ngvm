@@ -81,7 +81,7 @@ impl Vm {
         let meta = self.stack_metadata(index)?;
         let from = meta.index.0;
         let until = from + meta.value_type.size();
-        Ok(&self.stack[from..until])
+        self.stack.get(from..until).ok_or(VmError::BadVmState)
     }
 
     pub fn stack_metadata(&self, index: StackRef) -> Result<&StackMeta, VmError> {
@@ -171,6 +171,28 @@ impl Vm {
         Ok(())
     }
 
+    pub fn free_by_index(&mut self, index: StackRef) -> Result<(), VmError> {
+        let meta = self.stack_metadata(index)?;
+        let size = meta.value_type.size();
+        match &meta.value_type {
+            VmType::Primitive(_) => {}
+            VmType::PointedType(p) => match p.as_ref() {
+                PointedType::Arr { .. } => unimplemented!("Arrays are not implemented"),
+                PointedType::Ref(r) => {
+                    let ref_value = self
+                        .stack
+                        .get(self.last_stack_frame + meta.index.0)
+                        .ok_or(VmError::BadVmState)?;
+                    let located_ref = r.locate(ref_value);
+                    self.unlock_by_ref(located_ref)?;
+                }
+            },
+        }
+        self.stack.truncate(self.stack.len() - size);
+        Ok(())
+    }
+
+
     fn unlock_by_ref(&mut self, rf: LocatedRef) -> Result<(), VmError> {
         let vm_cycle = self.cycle;
         match rf {
@@ -197,6 +219,35 @@ impl Vm {
             }
         }
         Ok(())
+    }
+
+pub    fn switch_lock_cycle(&mut self, rf: LocatedRef) -> Result<(), VmError> {
+        let vm_cycle = self.cycle;
+        match rf {
+            LocatedRef::Stack(index) => {
+                let value_meta = self.stack_metadata_mut(StackRef(index))?;
+                if let ValueLock::Mut(_) = value_meta.lock {
+                    value_meta.lock = ValueLock::Mut(vm_cycle);
+                    Ok(())
+                }
+                else {
+                    Err(VmError::BadVmState)
+                }
+            }
+            LocatedRef::Transient(index) => {
+                let value_meta = self
+                    .transient_refs
+                    .get_mut(index)
+                    .ok_or(VmError::BadVmState)?;
+                if let ValueLock::Mut(_) = value_meta.lock {
+                   value_meta.lock = ValueLock::Mut(vm_cycle);
+                    Ok(())
+                } else {
+                    Err(VmError::BadVmState)
+                }
+            }
+        }
+
     }
 
     pub fn push_scope(&mut self) -> Result<(), VmError> {

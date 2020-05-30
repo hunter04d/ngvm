@@ -105,6 +105,7 @@ pub enum Opcode {
     TakeMut(StackRef),
     StartDeref(StackRef),
     EndDeref,
+    Mv(StackRef, StackRef),
     TraceStackValue(StackRef),
 }
 
@@ -242,6 +243,10 @@ impl Opcode {
             }
             StartDeref(r) => with_one_ref(Nc::StartDeref, r.0),
             EndDeref => single(Nc::EndDeref),
+            Mv(r, o) => with_two_refs(Nc::Mv, &TwoStackRefs {
+                result: *r,
+                op: *o
+            })
         };
         Some(b)
     }

@@ -107,7 +107,7 @@ fn decode_two_stack_ref(code: Opcode, chunk: &Chunk) -> Option<DecodedOpcode> {
 }
 
 macro_rules! generate_two_decode {
-    ($($fn_name: ident => $opcode: expr),*) => {
+    ($($fn_name: ident => $opcode: expr),* $(,)?) => {
         $(
         pub(in crate::decoder) fn $fn_name(chunk: &Chunk) ->  Option<DecodedOpcode> {
             decode_two_stack_ref($opcode, chunk)
@@ -123,7 +123,8 @@ generate_two_decode! {
     decode_b_not => Opcode::BNot,
     decode_b_be => Opcode::BBe,
 
-    decode_l_not => Opcode::LNot
+    decode_l_not => Opcode::LNot,
+    decode_mv => Opcode::Mv,
 }
 
 pub(super) fn decode_ld_true(_: &Chunk) -> Option<DecodedOpcode> {

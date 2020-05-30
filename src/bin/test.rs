@@ -77,9 +77,9 @@ fn test_deref() -> Vec<model::Opcode> {
             // 3
             StartDeref(s(1)),
             UAdd(three(3, 3, 2)),
-            EndDeref
+            EndDeref,
         ]),
-        TraceStackValue(s(0))
+        TraceStackValue(s(0)),
     ]
 }
 
