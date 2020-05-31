@@ -12,7 +12,6 @@ pub enum Opcode {
     LdTrue = 5,
     LdFalse = 6,
     LdSS = 8,
-    LdDS = 9,
     // u ops
     UAdd = 10,
     USub = 11,

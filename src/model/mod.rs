@@ -36,12 +36,7 @@ pub enum Opcode {
     LdFalse,
 
     /// Load static string from constant pool
-    LdSS {
-        location: PoolRef,
-    },
-    LdDS {
-        location: PoolRef,
-    },
+    LdSS(PoolRef),
     UAdd(ThreeStackRefs),
     USub(ThreeStackRefs),
     UMul(ThreeStackRefs),
@@ -157,8 +152,7 @@ impl Opcode {
                 type_location,
                 value_location,
             } => with_refs(Nc::LdType, &[type_location.0, value_location.0]),
-            LdSS { location } => with_one_ref(Nc::LdSS, location.0),
-            LdDS { location } => with_one_ref(Nc::LdDS, location.0),
+            LdSS(p) => with_one_ref(Nc::LdSS, p.0),
             LdUnit => single(Nc::LdUnit),
             UAdd(v) => with_three_refs(Nc::UAdd, v),
             USub(v) => with_three_refs(Nc::USub, v),

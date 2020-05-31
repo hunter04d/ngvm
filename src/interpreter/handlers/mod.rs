@@ -1,7 +1,7 @@
 use crate::code::Chunk;
 use crate::error::VmError;
 use crate::vm::{Vm, VmRefSource};
-
+use std::fmt::Write;
 use super::stack_tracer::StackTracer;
 use crate::code::refs::refs_size;
 
@@ -16,12 +16,10 @@ pub(in crate::interpreter) mod stack;
 pub(super) fn handle_trace_stack_value(chunk: &Chunk, vm: &mut Vm) -> Result<usize, VmError> {
     let stack_ref = chunk.read_ref_stack_vm(0)?;
     let meta = vm.stack_metadata(stack_ref)?;
-    eprintln!(
-        "Trace {:?}: {:#?}",
-        stack_ref,
-        // TODO: one pointer types are a thing rethink the StackTracer interface
-        StackTracer(&vm.stack[meta.index.0..], meta)
-    );
+    let data = vm.stack_data(stack_ref)?;
+    let mut trace = String::new();
+    write!(&mut trace, "{:#?}", StackTracer(data, meta)).map_err(|_| VmError::BadVmState)?;
+    eprintln!("Trace @{}: {}", stack_ref.0, trace);
     Ok(1 + refs_size(1))
 }
 

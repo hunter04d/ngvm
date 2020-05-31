@@ -333,6 +333,13 @@ impl Vm {
         }
     }
 
+    pub fn push_s_str(&mut self, ptr: usize, len: usize) {
+        let meta = self.stack_meta_of_type(PrimitiveType::SStr.into());
+        self.stack_metadata.push(meta);
+        self.stack.push(ptr.into_stack_data());
+        self.stack.push(len.into_stack_data());
+    }
+
     pub fn current_cycle(&self) -> usize {
         self.cycle
     }

@@ -51,3 +51,13 @@ pub(in crate::interpreter) fn handle_ld_false(_: &Chunk, vm: &mut Vm) -> Result<
     vm.push_primitive(false.into_stack_data(), PrimitiveType::Bool);
     Ok(1)
 }
+
+pub(in crate::interpreter) fn handle_ld_ss(chunk: &Chunk, vm: &mut Vm) -> Result<usize, VmError> {
+    let pool = vm.current_const_pool();
+    let rf = chunk.read_ref_pool_vm(0)?;
+    let str = pool.get_s_str(rf).ok_or(VmError::ConstantPoolError)?;
+    let ptr: usize = str.as_ptr() as usize;
+    let len = str.len();
+    vm.push_s_str(ptr, len);
+    Ok(1 + refs_size(1))
+}

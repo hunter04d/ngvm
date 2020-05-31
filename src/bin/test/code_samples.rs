@@ -1,7 +1,5 @@
 use ngvm::code::refs::*;
 use ngvm::model::{self, Opcode::*};
-use ngvm::types::PrimitiveType::*;
-use ngvm::ConstantPool;
 
 #[allow(dead_code)]
 pub(super) fn fibonacci() -> Vec<model::Opcode> {
@@ -81,16 +79,4 @@ pub(super) fn test_deref() -> Vec<model::Opcode> {
         ]),
         TraceStackValue(s(0)),
     ]
-}
-
-#[allow(dead_code)]
-pub(super) fn test_arr() -> (Vec<model::Opcode>, ConstantPool) {
-    let max_size = 100_000 as usize;
-    let mut code = Vec::with_capacity(max_size * 3);
-    for i in 0..max_size {
-        let l = &[StartScope, SArrCreate0(i, p(0)), EndScope];
-        code.extend_from_slice(l);
-    }
-    let pool = ConstantPool::new(vec![U64.into()]);
-    (code, pool)
 }

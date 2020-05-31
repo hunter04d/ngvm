@@ -22,7 +22,7 @@ pub(crate) static HANDLERS: [IntHandler; 256] = [
     handle_ld_true,           // 5
     handle_ld_false,          // 6
     noop,                     // 7
-    noop,                     // 8
+    handle_ld_ss,             // 8
     noop,                     // 9
     handle_u_add,             // 10
     handle_u_sub,             // 11

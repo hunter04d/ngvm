@@ -35,6 +35,12 @@ impl From<PrimitiveType> for Constant {
     }
 }
 
+impl From<&'_ str> for Constant {
+    fn from(obj: &str) -> Self {
+        Constant::String(Box::from(obj))
+    }
+}
+
 /// Pool of constants of specific module
 ///
 /// Essentially new-type around `Vec<`[`Constant`](self::Constant)`>`
@@ -53,6 +59,14 @@ impl ConstantPool {
     pub fn get_type(&self, index: PoolRef) -> Option<PrimitiveType> {
         if let Some(Constant::Type(t)) = self.get(index) {
             Some(*t)
+        } else {
+            None
+        }
+    }
+
+    pub fn get_s_str(&self, index: PoolRef) -> Option<&str> {
+        if let Some(Constant::String(s)) = self.get(index) {
+            Some(s)
         } else {
             None
         }

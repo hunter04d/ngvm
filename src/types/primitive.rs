@@ -18,7 +18,7 @@ pub enum PrimitiveType {
     F64 = 10,
     Bool = 11,
     Char = 12,
-
+    SStr = 13,
     /// Stack frame
     ///
     /// this type uses metadata for its own purpose
@@ -89,6 +89,8 @@ impl PrimitiveType {
             1
         } else if matches!(self, PrimitiveType::Never) {
             0
+        } else if matches!(self, PrimitiveType::SStr) {
+            2
         } else {
             panic!("No size defined for {:?}", self);
         }
