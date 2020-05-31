@@ -11,7 +11,7 @@ use crate::code::refs::*;
 use crate::opcodes::Opcode as Nc;
 
 /// Vm opcode represented as Rust enum (size constraints be dammed)
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum Opcode {
     /// Load 0 u64
     Ld0U64,
@@ -106,6 +106,7 @@ pub enum Opcode {
     StartDeref(StackRef),
     EndDeref,
     Mv(StackRef, StackRef),
+    SArrCreate0(usize, PoolRef),
     TraceStackValue(StackRef),
 }
 
@@ -244,6 +245,7 @@ impl Opcode {
             StartDeref(r) => with_one_ref(Nc::StartDeref, r.0),
             EndDeref => single(Nc::EndDeref),
             Mv(r, o) => with_two_refs(Nc::Mv, &TwoStackRefs { result: *r, op: *o }),
+            SArrCreate0(len, r) => with_offset_and_ref(Nc::SArrCreate0, *len, r.0),
         };
         Some(b)
     }

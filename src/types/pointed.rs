@@ -6,16 +6,16 @@ use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum PointedType {
-    Arr { len: usize, pointer: VmType },
+    SArr(SArrType),
     Ref(RefType),
 }
 
 impl PointedType {
-    pub fn arr(pointer: impl Into<VmType>, len: usize) -> Self {
-        PointedType::Arr {
+    pub fn s_arr(pointer: impl Into<VmType>, len: usize) -> Self {
+        PointedType::SArr(SArrType {
             len,
             pointer: pointer.into(),
-        }
+        })
     }
 
     pub fn reference(pointer: impl Into<VmType>, kind: RefKind, location: RefLocation) -> Self {
@@ -36,8 +36,8 @@ impl PointedType {
 
     pub fn size(&self) -> usize {
         match self {
-            PointedType::Arr { len, pointer } => len * pointer.size(),
-            PointedType::Ref { .. } => 1,
+            PointedType::SArr(SArrType { len, pointer }) => len * pointer.size(),
+            PointedType::Ref(_) => 1,
         }
     }
 }
@@ -64,6 +64,12 @@ pub enum RefLocation {
 pub struct RefType {
     pub kind: RefKind,
     pub points_to: RefLocation,
+    pub pointer: VmType,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct SArrType {
+    pub len: usize,
     pub pointer: VmType,
 }
 
@@ -99,7 +105,9 @@ impl Display for RefType {
         match &self.pointer {
             VmType::Primitive(p) => write!(f, "{:?}", p),
             VmType::PointedType(p) => match p.as_ref() {
-                PointedType::Arr { len, pointer } => write!(f, "[{:?};{}]", pointer, len),
+                PointedType::SArr(SArrType { len, pointer }) => {
+                    write!(f, "[{:?};{}]", pointer, len)
+                }
                 PointedType::Ref(r) => write!(f, "({})", r),
             },
         }

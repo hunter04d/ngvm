@@ -31,6 +31,10 @@ impl StackMeta {
 pub trait Meta {
     fn vm_type(&self) -> &VmType;
 
+    fn lock(&self) -> &ValueLock;
+
+    fn lock_mut(&mut self) -> &mut ValueLock;
+
     fn check<'a, 'c>(
         &'a self,
         tag: impl Into<Tag>,
@@ -48,6 +52,14 @@ impl Meta for StackMeta {
     fn vm_type(&self) -> &VmType {
         &self.value_type
     }
+
+    fn lock(&self) -> &ValueLock {
+        &self.lock
+    }
+
+    fn lock_mut(&mut self) -> &mut ValueLock {
+        &mut self.lock
+    }
 }
 
 #[derive(Debug)]
@@ -61,5 +73,13 @@ pub struct TransientMeta {
 impl Meta for TransientMeta {
     fn vm_type(&self) -> &VmType {
         &self.value_type
+    }
+
+    fn lock(&self) -> &ValueLock {
+        &self.lock
+    }
+
+    fn lock_mut(&mut self) -> &mut ValueLock {
+        &mut self.lock
     }
 }

@@ -44,6 +44,6 @@ pub(in crate::interpreter) fn handle_mv(chunk: &Chunk, vm: &mut Vm) -> Result<us
     let value = vm.stack_data(op)?.to_vec();
 
     vm.stack.splice(from..until, value);
-
+    vm.stack_metadata_mut(result)?.was_moved = false;
     Ok(1 + refs_size(2))
 }

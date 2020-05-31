@@ -1,10 +1,10 @@
 use ngvm::code::refs::*;
-use ngvm::error::{VmContextError, VmError};
 use ngvm::model::{self, Opcode::*};
 use ngvm::types::PrimitiveType::*;
-use ngvm::{Code, ConstantPool, Vm};
+use ngvm::ConstantPool;
+
 #[allow(dead_code)]
-fn fibonacci() -> Vec<model::Opcode> {
+pub(super) fn fibonacci() -> Vec<model::Opcode> {
     vec![
         Ld0U64, // 0
         Ld0U64, // 1
@@ -49,7 +49,7 @@ fn fibonacci() -> Vec<model::Opcode> {
 }
 
 #[allow(dead_code)]
-fn ref_test() -> Vec<model::Opcode> {
+pub(super) fn ref_test() -> Vec<model::Opcode> {
     vec![
         Ld0U64,
         Scope(vec![
@@ -64,7 +64,7 @@ fn ref_test() -> Vec<model::Opcode> {
 }
 
 #[allow(dead_code)]
-fn test_deref() -> Vec<model::Opcode> {
+pub(super) fn test_deref() -> Vec<model::Opcode> {
     vec![
         Ld0U64,
         Scope(vec![
@@ -83,27 +83,14 @@ fn test_deref() -> Vec<model::Opcode> {
     ]
 }
 
-fn run(code: &[model::Opcode], pool: ConstantPool) -> Result<(), VmContextError> {
-    // spin up a vm instance
-    let mut vm = Vm::headless(pool);
-    let code = Code::from_model(code).ok_or(VmError::InvalidBytecode)?;
-
-    let decode = code.decode();
-    if !decode.is_full {
-        panic!("Bad code")
-    } else {
-        decode.print(true);
+#[allow(dead_code)]
+pub(super) fn test_arr() -> (Vec<model::Opcode>, ConstantPool) {
+    let max_size = 100_000 as usize;
+    let mut code = Vec::with_capacity(max_size * 3);
+    for i in 0..max_size {
+        let l = &[StartScope, SArrCreate0(i, p(0)), EndScope];
+        code.extend_from_slice(l);
     }
-
-    code.interpret(&mut vm)
-}
-
-fn main() {
-    // let code = fibonacci();
-    let code = test_deref();
-    let pool = ConstantPool::new(vec![U64.into(), 10u64.into(), 1u64.into()]);
-    let result = run(&code, pool);
-    if let Err(e) = result {
-        println!("{:?}", e);
-    }
+    let pool = ConstantPool::new(vec![U64.into()]);
+    (code, pool)
 }

@@ -43,7 +43,7 @@ impl VmType {
         match self {
             VmType::Primitive(_) => true,
             VmType::PointedType(p) => match p.as_ref() {
-                PointedType::Arr { .. } => false,
+                PointedType::SArr(a) => a.pointer.is_copy(),
                 PointedType::Ref(r) => r.is_copy(),
             },
         }

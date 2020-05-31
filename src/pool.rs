@@ -1,7 +1,9 @@
 use std::mem::size_of;
 
+use crate::code::refs::PoolRef;
 use crate::types::PrimitiveType;
 use std::convert::TryInto;
+
 #[derive(Debug)]
 pub enum Constant {
     Value([u8; 16]),
@@ -44,11 +46,11 @@ impl ConstantPool {
         Self(constants)
     }
 
-    pub fn get(&self, index: usize) -> Option<&Constant> {
-        self.0.get(index)
+    pub fn get(&self, index: PoolRef) -> Option<&Constant> {
+        self.0.get(index.0)
     }
 
-    pub fn get_type(&self, index: usize) -> Option<PrimitiveType> {
+    pub fn get_type(&self, index: PoolRef) -> Option<PrimitiveType> {
         if let Some(Constant::Type(t)) = self.get(index) {
             Some(*t)
         } else {
@@ -56,7 +58,7 @@ impl ConstantPool {
         }
     }
 
-    pub fn get_single(&self, index: usize) -> Option<[u8; 8]> {
+    pub fn get_single(&self, index: PoolRef) -> Option<[u8; 8]> {
         if let Some(Constant::Value(v)) = self.get(index) {
             Some(v[..8].try_into().unwrap())
         } else {
@@ -64,7 +66,7 @@ impl ConstantPool {
         }
     }
 
-    pub fn get_wide(&self, index: usize) -> Option<[u8; 16]> {
+    pub fn get_wide(&self, index: PoolRef) -> Option<[u8; 16]> {
         if let Some(Constant::Value(v)) = self.get(index) {
             Some(*v)
         } else {

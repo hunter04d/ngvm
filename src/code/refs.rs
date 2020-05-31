@@ -104,3 +104,7 @@ pub const fn p(r: usize) -> PoolRef {
 pub const fn refs_size(n_refs: usize) -> usize {
     n_refs * size_of::<StackRef>()
 }
+
+pub const fn refs_size_with_offset(n_refs: usize) -> usize {
+    refs_size(n_refs) + size_of::<usize>()
+}

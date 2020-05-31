@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::code::refs::StackRef;
 use crate::error::VmError;
-use crate::meta::{StackMeta, TransientMeta};
+use crate::meta::{Meta, StackMeta, TransientMeta};
 use crate::stack::data::IntoStackData;
 use crate::stack::data::StackData;
 use crate::types::{PointedType, PrimitiveType, RefKind, RefLocation, RefType, VmType};
@@ -155,7 +155,7 @@ impl Vm {
             match meta.value_type {
                 VmType::Primitive(_) => {}
                 VmType::PointedType(p) => match *p {
-                    PointedType::Arr { .. } => unimplemented!("Arrays are not implemented"),
+                    PointedType::SArr(_) => {}
                     PointedType::Ref(r) => {
                         let ref_value = self
                             .stack
@@ -173,11 +173,11 @@ impl Vm {
 
     pub fn free_by_index(&mut self, index: StackRef) -> Result<(), VmError> {
         let meta = self.stack_metadata(index)?;
-        let size = meta.value_type.size();
+        let is_copy = meta.value_type.is_copy();
         match &meta.value_type {
             VmType::Primitive(_) => {}
             VmType::PointedType(p) => match p.as_ref() {
-                PointedType::Arr { .. } => unimplemented!("Arrays are not implemented"),
+                PointedType::SArr(_) => {}
                 PointedType::Ref(r) => {
                     let ref_value = self
                         .stack
@@ -188,7 +188,9 @@ impl Vm {
                 }
             },
         }
-        self.stack.truncate(self.stack.len() - size);
+        if !is_copy {
+            self.stack_metadata_mut(index)?.was_moved = true;
+        }
         Ok(())
     }
 
@@ -221,28 +223,29 @@ impl Vm {
     }
 
     pub fn switch_lock_cycle(&mut self, rf: LocatedRef) -> Result<(), VmError> {
+        fn switch_cycle(m: &mut impl Meta, new_cycle: usize) -> Result<(), VmError> {
+            match m.lock() {
+                ValueLock::Mut(current_cycle) if new_cycle >= *current_cycle => {
+                    *m.lock_mut() = ValueLock::Mut(new_cycle);
+                    Ok(())
+                }
+                // TODO: different error
+                ValueLock::Mut(_) => Err(VmError::BadVmState),
+                _ => Err(VmError::BadVmState),
+            }
+        }
         let vm_cycle = self.cycle;
         match rf {
             LocatedRef::Stack(index) => {
                 let value_meta = self.stack_metadata_mut(StackRef(index))?;
-                if let ValueLock::Mut(_) = value_meta.lock {
-                    value_meta.lock = ValueLock::Mut(vm_cycle);
-                    Ok(())
-                } else {
-                    Err(VmError::BadVmState)
-                }
+                switch_cycle(value_meta, vm_cycle)
             }
             LocatedRef::Transient(index) => {
                 let value_meta = self
                     .transient_refs
                     .get_mut(&index)
                     .ok_or(VmError::BadVmState)?;
-                if let ValueLock::Mut(_) = value_meta.lock {
-                    value_meta.lock = ValueLock::Mut(vm_cycle);
-                    Ok(())
-                } else {
-                    Err(VmError::BadVmState)
-                }
+                switch_cycle(value_meta, vm_cycle)
             }
         }
     }
@@ -301,10 +304,13 @@ impl Vm {
                         ValueLocation::Heap(_) => unimplemented!(),
                     },
                 }
+                self.stack_metadata_mut(d.deref)?.was_moved = true;
             }
-            self.pop_stack()?;
+
+            Ok(())
+        } else {
+            Err(VmError::BadVmState)
         }
-        Ok(())
     }
 
     pub fn locate_ref(&self, index: StackRef) -> Result<(LocatedRef, &RefType), VmError> {
@@ -314,6 +320,16 @@ impl Vm {
             Ok((r.locate(data), r))
         } else {
             Err(VmError::BadVmState)
+        }
+    }
+
+    pub fn push_array_0(&mut self, size: usize, t: PrimitiveType) {
+        let arr_type = PointedType::s_arr(t, size);
+        let stack_size = arr_type.size();
+        let meta = self.stack_meta_of_type(arr_type.into());
+        self.stack_metadata.push(meta);
+        for _ in 0..stack_size {
+            self.stack.push(Default::default())
         }
     }
 

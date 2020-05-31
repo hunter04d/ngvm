@@ -35,15 +35,18 @@ pub(super) mod code {
         }
 
         fn read_ref_pool_vm(&self, index: usize) -> Result<PoolRef, Self::VmError> {
-            Ok(PoolRef(self.read_ref_vm(index)?))
+            self.read_ref_vm(index).map(PoolRef)
         }
 
         fn read_ref_stack_vm(&self, index: usize) -> Result<StackRef, Self::VmError> {
-            Ok(StackRef(self.read_ref_vm(index)?))
+            self.read_ref_vm(index).map(StackRef)
         }
 
         fn read_ref_stack_with_offset_vm(&self, index: usize) -> Result<StackRef, Self::VmError> {
             self.read_ref_with_offset_vm(index).map(StackRef)
+        }
+        fn read_ref_pool_with_offset_vm(&self, index: usize) -> Result<PoolRef, Self::VmError> {
+            self.read_ref_with_offset_vm(index).map(PoolRef)
         }
     }
 

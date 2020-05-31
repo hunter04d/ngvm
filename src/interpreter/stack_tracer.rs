@@ -42,7 +42,10 @@ impl<'a> Debug for StackTracer<'a> {
                 }
                 VmType::PointedType(p) => {
                     match p.deref() {
-                        PointedType::Arr { .. } => unimplemented!("Arrays are not implemented"),
+                        PointedType::SArr(a) => {
+                            s.field("data", &"<S Arr>");
+                            s.field("type", &format!("[{:?};{}]", a.pointer, a.len));
+                        }
                         PointedType::Ref(r) => {
                             // TODO: add cycle to the type of ref
                             s.field("data", &usize::from_single(data_0.unwrap()));
