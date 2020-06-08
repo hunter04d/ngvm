@@ -38,6 +38,7 @@ where
         .all_primitives()
         .op2()
         .one_of(&[PrimitiveType::U32, PrimitiveType::U16, PrimitiveType::U8])
+        .and()
         .result()
         .along_with(|c| c.op1())
         .are_same()

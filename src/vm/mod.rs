@@ -58,6 +58,23 @@ impl Vm {
         Self::with_module(module)
     }
 
+    pub fn light(pool: ConstantPool) -> Self {
+        let module = Module::new(pool);
+        let mut map = HashMap::new();
+        map.insert("".into(), module);
+        Self {
+            stack: Vec::new(),
+            stack_metadata: Vec::new(),
+            transient_refs: HashMap::new(),
+            derefs: Vec::new(),
+            cycle: 1,
+            ip: 0,
+            last_stack_frame: 0,
+            modules: map,
+            current_module: "".into(),
+        }
+    }
+
     pub fn default_growing_stack() -> Self {
         Self {
             stack: Vec::new(),
@@ -328,9 +345,8 @@ impl Vm {
         let stack_size = arr_type.size();
         let meta = self.stack_meta_of_type(arr_type.into());
         self.stack_metadata.push(meta);
-        for _ in 0..stack_size {
-            self.stack.push(Default::default())
-        }
+        self.stack
+            .extend(std::iter::repeat(StackData::default()).take(stack_size))
     }
 
     pub fn push_s_str(&mut self, ptr: usize, len: usize) {

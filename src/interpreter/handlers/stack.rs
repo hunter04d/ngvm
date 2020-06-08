@@ -1,19 +1,21 @@
 use crate::code::refs::refs_size;
 use crate::code::Chunk;
 use crate::error::VmError;
+use crate::stack::data::StackData;
 use crate::types::checker::{Taggable, TypeError};
 use crate::types::{PointedType, RefKind};
 use crate::vm::VmRefSource;
 use crate::Vm;
+use smallvec::SmallVec;
 
 pub(in crate::interpreter) fn handle_mv(chunk: &Chunk, vm: &mut Vm) -> Result<usize, VmError> {
     let result = chunk.read_ref_stack_vm(0)?;
-    let op = chunk.read_ref_stack_vm(0)?;
+    let op = chunk.read_ref_stack_vm(1)?;
     let result_meta = vm.stack_metadata(result)?;
     let op_meta = vm.stack_metadata(op)?;
 
     let from = result_meta.index.0;
-    let until = result_meta.value_type.size();
+    let until = from + result_meta.value_type.size();
     if result_meta.value_type != op_meta.value_type {
         let result_type = result_meta.value_type.clone().tag("r");
         let op_type = op_meta.value_type.clone().tag("o");
@@ -41,7 +43,11 @@ pub(in crate::interpreter) fn handle_mv(chunk: &Chunk, vm: &mut Vm) -> Result<us
         op_meta.was_moved = true;
     }
 
-    let value = vm.stack_data(op)?.to_vec();
+    let value = vm
+        .stack_data(op)?
+        .iter()
+        .copied()
+        .collect::<SmallVec<[StackData; 1]>>();
 
     vm.stack.splice(from..until, value);
     vm.stack_metadata_mut(result)?.was_moved = false;

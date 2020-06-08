@@ -39,10 +39,10 @@ pub trait Meta {
         &'a self,
         tag: impl Into<Tag>,
         ctx: &'c mut TypeCheckerCtx,
-    ) -> TypeChecker<'a, 'c> {
+    ) -> TypeChecker<'a, &'c mut TypeCheckerCtx> {
         TypeChecker {
             tag: tag.into(),
-            vm_type: self.vm_type(),
+            vm_type: Some(self.vm_type()),
             ctx,
         }
     }

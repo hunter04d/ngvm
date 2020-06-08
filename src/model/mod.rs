@@ -9,6 +9,8 @@ use Opcode::*;
 
 use crate::code::refs::*;
 use crate::opcodes::Opcode as Nc;
+use smallvec::SmallVec;
+use std::iter::FromIterator;
 
 /// Vm opcode represented as Rust enum (size constraints be dammed)
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -105,6 +107,8 @@ pub enum Opcode {
     TraceStackValue(StackRef),
 }
 
+type OpcodeBytes = SmallVec<[u8; 32]>;
+
 #[derive(Default)]
 pub struct ToBytesCtx {
     label_table: HashMap<usize, usize>,
@@ -121,8 +125,16 @@ impl ToBytesCtx {
         }
     }
 
-    // TODO: label transliteration and patching
-    pub(crate) fn convert(mut self, ops: &[Opcode]) -> Option<Vec<u8>> {
+    pub fn with_reserved_space(ops: &[Opcode]) -> Self {
+        let capacity: usize = ops.iter().map(Opcode::size_in_bytes).sum();
+        Self {
+            label_table: Default::default(),
+            jump_patch_table: Default::default(),
+            bytes: Vec::with_capacity(capacity + ops.len()),
+        }
+    }
+
+    pub fn convert(mut self, ops: &[Opcode]) -> Option<Vec<u8>> {
         for op in ops {
             let extend = op.to_bytes(&mut self)?;
             self.bytes.extend(extend);
@@ -133,9 +145,9 @@ impl ToBytesCtx {
             let until = from + S;
             let value: [u8; S] = self.bytes[from..until].try_into().ok()?;
             let key = usize::from_le_bytes(value);
-            let value = self.label_table.get(&key)?;
-            let bytes = value.to_le_bytes();
-            let bytes = bytes.iter().copied();
+            let value = self.label_table.get(&key)?.to_le_bytes();
+            let bytes = value.iter().copied();
+
             self.bytes.splice(from..until, bytes);
         }
         Some(self.bytes)
@@ -143,7 +155,7 @@ impl ToBytesCtx {
 }
 
 impl Opcode {
-    pub fn to_bytes(&self, ctx: &mut ToBytesCtx) -> Option<Vec<u8>> {
+    pub fn to_bytes(&self, ctx: &mut ToBytesCtx) -> Option<OpcodeBytes> {
         let b = match self {
             Ld0U64 => single(Nc::U64Ld0),
             Ld0I64 => single(Nc::I64Ld0),
@@ -219,7 +231,7 @@ impl Opcode {
             Label(l) => {
                 let len = ctx.bytes.len();
                 ctx.label_table.insert(*l, len);
-                Vec::new()
+                OpcodeBytes::new()
             }
             StartScope => single(Nc::StartScope),
             EndScope => single(Nc::EndScope),
@@ -227,7 +239,7 @@ impl Opcode {
             TakeMut(r) => with_one_ref(Nc::TakeMut, r.0),
             TraceStackValue(v) => with_one_ref(Nc::TraceStackValue, v.0),
             Scope(opcodes) => {
-                let mut result = Vec::new();
+                let mut result = SmallVec::new();
                 result.extend_from_slice(&single(Nc::StartScope));
 
                 for op in opcodes {
@@ -243,15 +255,79 @@ impl Opcode {
         };
         Some(b)
     }
+
+    pub fn size_in_bytes(&self) -> usize {
+        match self {
+            Ld0U64 => 1,
+            Ld0I64 => 1,
+            LdTyped0 { .. } => 1 + refs_size(2),
+            LDType { .. } => 1 + refs_size(2),
+            LdUnit => 1,
+            LdTrue => 1,
+            LdFalse => 1,
+            LdSS(_) => 1 + refs_size(1),
+            UAdd(_) => 1 + refs_size(3),
+            USub(_) => 1 + refs_size(1),
+            UMul(_) => 1 + refs_size(1),
+            UDiv(_) => 1 + refs_size(1),
+            URem(_) => 1 + refs_size(1),
+            IAdd(_) => 1 + refs_size(3),
+            ISub(_) => 1 + refs_size(3),
+            IMul(_) => 1 + refs_size(3),
+            IDiv(_) => 1 + refs_size(3),
+            IRem(_) => 1 + refs_size(3),
+            INeg(_) => 1 + refs_size(2),
+            FAdd(_) => 1 + refs_size(3),
+            FSub(_) => 1 + refs_size(3),
+            FMul(_) => 1 + refs_size(3),
+            FDiv(_) => 1 + refs_size(3),
+            FRem(_) => 1 + refs_size(3),
+            FNeg(_) => 1 + refs_size(2),
+            BAnd(_) => 1 + refs_size(3),
+            BOr(_) => 1 + refs_size(3),
+            BNot(_) => 1 + refs_size(2),
+            BBe(_) => 1 + refs_size(2),
+            BXor(_) => 1 + refs_size(3),
+            LAnd(_) => 1 + refs_size(3),
+            LOr(_) => 1 + refs_size(3),
+            LNot(_) => 1 + refs_size(2),
+            LXor(_) => 1 + refs_size(3),
+            Shl(_) => 1 + refs_size(3),
+            Shr(_) => 1 + refs_size(3),
+            RotL(_) => 1 + refs_size(3),
+            RotR(_) => 1 + refs_size(3),
+            Ge(_) => 1 + refs_size(3),
+            Gt(_) => 1 + refs_size(3),
+            Le(_) => 1 + refs_size(3),
+            Lt(_) => 1 + refs_size(3),
+            Eq(_) => 1 + refs_size(3),
+            Ne(_) => 1 + refs_size(3),
+            J { .. } => 1 + refs_size(1),
+            JC { .. } => 1 + refs_size(2),
+            JOffset { .. } => 1 + refs_size(1),
+            JCOffset { .. } => 1 + refs_size(1),
+            Label(_) => 0,
+            StartScope => 1,
+            EndScope => 1,
+            Scope(ops) => 2 + ops.iter().map(|o| o.size_in_bytes()).sum::<usize>(),
+            TakeRef(_) => 1 + refs_size(1),
+            TakeMut(_) => 1 + refs_size(1),
+            StartDeref(_) => 1 + refs_size(1),
+            EndDeref => 1,
+            Mv(_, _) => 1 + refs_size(2),
+            SArrCreate0(_, _) => 1 + refs_size(2),
+            TraceStackValue(_) => 1 + refs_size(1),
+        }
+    }
 }
 
 #[inline]
-fn single(code: Nc) -> Vec<u8> {
-    code.bytes()
+fn single(code: Nc) -> OpcodeBytes {
+    OpcodeBytes::from_iter(code.bytes())
 }
 
-fn with_refs(code: Nc, refs: &[usize]) -> Vec<u8> {
-    let mut res = Vec::with_capacity(1 + refs.len() * size_of::<usize>());
+fn with_refs(code: Nc, refs: &[usize]) -> OpcodeBytes {
+    let mut res = OpcodeBytes::new();
     res.extend_from_slice(&code.bytes());
     for &reference in refs {
         res.extend_from_slice(&reference.to_le_bytes());
@@ -259,23 +335,23 @@ fn with_refs(code: Nc, refs: &[usize]) -> Vec<u8> {
     res
 }
 
-fn with_one_ref(code: Nc, r: Ref) -> Vec<u8> {
-    let mut res = Vec::with_capacity(code.size() + refs_size(1));
+fn with_one_ref(code: Nc, r: Ref) -> OpcodeBytes {
+    let mut res = OpcodeBytes::new();
     res.extend_from_slice(&code.bytes());
     res.extend_from_slice(&r.to_le_bytes());
     res
 }
 
-fn with_two_refs(code: Nc, refs: &TwoStackRefs) -> Vec<u8> {
-    let mut res = Vec::with_capacity(code.size() + refs_size(2));
+fn with_two_refs(code: Nc, refs: &TwoStackRefs) -> OpcodeBytes {
+    let mut res = OpcodeBytes::new();
     res.extend_from_slice(&code.bytes());
     res.extend_from_slice(&refs.result.0.to_le_bytes());
     res.extend_from_slice(&refs.op.0.to_le_bytes());
     res
 }
 
-fn with_three_refs(code: Nc, refs: &ThreeStackRefs) -> Vec<u8> {
-    let mut res = Vec::with_capacity(code.size() + refs_size(3));
+fn with_three_refs(code: Nc, refs: &ThreeStackRefs) -> OpcodeBytes {
+    let mut res = OpcodeBytes::new();
     res.extend(code.bytes());
     res.extend_from_slice(&refs.result.0.to_le_bytes());
     res.extend_from_slice(&refs.op1.0.to_le_bytes());
@@ -283,15 +359,15 @@ fn with_three_refs(code: Nc, refs: &ThreeStackRefs) -> Vec<u8> {
     res
 }
 
-fn with_offset(code: Nc, offset: usize) -> Vec<u8> {
-    let mut res = Vec::with_capacity(code.size() + size_of::<usize>());
+fn with_offset(code: Nc, offset: usize) -> OpcodeBytes {
+    let mut res = OpcodeBytes::new();
     res.extend(code.bytes());
     res.extend_from_slice(&offset.to_le_bytes());
     res
 }
 
-fn with_offset_and_ref(code: Nc, offset: usize, r: Ref) -> Vec<u8> {
-    let mut res = Vec::with_capacity(code.size() + size_of::<usize>() + refs_size(1));
+fn with_offset_and_ref(code: Nc, offset: usize, r: Ref) -> OpcodeBytes {
+    let mut res = OpcodeBytes::new();
     res.extend(code.bytes());
     res.extend_from_slice(&offset.to_le_bytes());
     res.extend_from_slice(&r.to_le_bytes());

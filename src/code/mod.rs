@@ -40,8 +40,12 @@ impl TryFrom<Vec<model::Opcode>> for Code {
 
 impl Code {
     pub fn from_model(ops: &[model::Opcode]) -> Option<Code> {
-        let ctx = ToBytesCtx::new();
-        Some(Self(ctx.convert(ops)?))
+        Self::from_model_with_ctx(ops, ToBytesCtx::new())
+    }
+
+    pub fn from_model_with_ctx(ops: &[model::Opcode], ctx: ToBytesCtx) -> Option<Code> {
+        let converted = ctx.convert(ops)?;
+        Some(Self(converted))
     }
 }
 
@@ -168,7 +172,9 @@ impl DecodeResult {
         let w = self.size.to_string().len();
         for op in &self.opcodes {
             if print_bytes {
-                let mut bytes = op.op_code.bytes();
+                let capacity = op.op_code.size() + op.refs.count() * size_of::<Ref>();
+                let mut bytes = Vec::with_capacity(capacity);
+                bytes.extend_from_slice(&op.op_code.bytes());
                 bytes.extend_from_slice(&op.refs.bytes());
                 let bytes = bytes
                     .into_iter()

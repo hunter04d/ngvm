@@ -22,6 +22,7 @@ pub(in crate::interpreter) fn handle_jc(chunk: &Chunk, vm: &mut Vm) -> Result<us
         .check(tags::COND, &mut t_ctx)
         .primitive()
         .bool()
+        .and()
         .get_vm()?;
     if vm.single_stack_data(cond)?.into_primitive() {
         vm.ip = offset;

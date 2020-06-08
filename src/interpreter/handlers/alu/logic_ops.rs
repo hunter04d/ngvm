@@ -77,6 +77,7 @@ pub(in crate::interpreter) fn handle_l_not(chunk: &Chunk, vm: &mut Vm) -> Result
         .integer()
         .or()
         .bool()
+        .and()
         .fmt(|_, t| format!("<{}>{:?} is neither integer or bool", t.tag, t.vm_type))
         .get_vm()?;
 

@@ -40,11 +40,11 @@ impl CodeRef {
         }
     }
 
-    pub fn to_bytes(&self) -> Vec<u8> {
+    pub fn to_bytes(&self) -> [u8; size_of::<Ref>()] {
         match self {
-            CodeRef::Stack(r) => Vec::from(r.0.to_le_bytes()),
-            CodeRef::Pool(r) => Vec::from(r.0.to_le_bytes()),
-            CodeRef::Offset(r) => Vec::from(r.to_le_bytes()),
+            CodeRef::Stack(r) => r.0.to_le_bytes(),
+            CodeRef::Pool(r) => r.0.to_le_bytes(),
+            CodeRef::Offset(r) => r.to_le_bytes(),
         }
     }
 }

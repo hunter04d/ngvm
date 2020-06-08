@@ -21,10 +21,12 @@ fn handle_bi_op(
         .all_primitives()
         .result()
         .equals(PrimitiveType::Bool)
+        .and()
         .operands()
         .same()
         .and()
         .user()
+        .and()
         .get_vm()?;
 
     let op1 = *vm.single_stack_data(rf.op1)?;
@@ -48,8 +50,10 @@ fn handle_u_op(
         .all_primitives()
         .result()
         .bool()
+        .and()
         .op()
         .user()
+        .and()
         .get_vm()?;
 
     let op = vm.single_stack_data(rf.op)?;

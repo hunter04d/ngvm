@@ -1,5 +1,6 @@
 use crate::code::refs::{refs_size, CodeRef};
 use crate::opcodes::Opcode;
+use smallvec::SmallVec;
 use std::borrow::Cow;
 use std::fmt::{self, Display, Formatter};
 
@@ -81,28 +82,28 @@ impl DecoderRefs {
         }
     }
 
-    pub fn bytes(&self) -> Vec<u8> {
+    pub fn bytes(&self) -> SmallVec<[u8; 32]> {
         // TODO: possible optimization with the allocated size
-        let mut res = Vec::new();
+        let mut res = SmallVec::new();
         match self {
             DecoderRefs::Zero => {}
             DecoderRefs::One(r) => {
-                res.extend(r.code_ref.to_bytes());
+                res.extend_from_slice(&r.code_ref.to_bytes());
             }
             DecoderRefs::Two(r1, r2) => {
-                res.extend(r1.code_ref.to_bytes());
-                res.extend(r2.code_ref.to_bytes());
+                res.extend_from_slice(&r1.code_ref.to_bytes());
+                res.extend_from_slice(&r2.code_ref.to_bytes());
             }
             DecoderRefs::Three(r1, r2, r3) => {
-                res.extend(r1.code_ref.to_bytes());
-                res.extend(r2.code_ref.to_bytes());
-                res.extend(r3.code_ref.to_bytes());
+                res.extend_from_slice(&r1.code_ref.to_bytes());
+                res.extend_from_slice(&r2.code_ref.to_bytes());
+                res.extend_from_slice(&r3.code_ref.to_bytes());
             }
             DecoderRefs::Four(r1, r2, r3, r4) => {
-                res.extend(r1.code_ref.to_bytes());
-                res.extend(r2.code_ref.to_bytes());
-                res.extend(r3.code_ref.to_bytes());
-                res.extend(r4.code_ref.to_bytes());
+                res.extend_from_slice(&r1.code_ref.to_bytes());
+                res.extend_from_slice(&r2.code_ref.to_bytes());
+                res.extend_from_slice(&r3.code_ref.to_bytes());
+                res.extend_from_slice(&r4.code_ref.to_bytes());
             }
         }
         res

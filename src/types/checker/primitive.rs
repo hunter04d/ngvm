@@ -2,8 +2,13 @@ use crate::types::{PrimitiveType, ThreePrimitiveTypes, TwoPrimitiveTypes, VmType
 
 use super::{tags, HasTypeCheckerCtx, Tag, Taggable, TaggedType, TypeCheckerCtx, TypeError};
 
-fn report_not_user(t: &TaggedType) -> String {
-    format!("{} of {:?} is not a user primitive type", t.tag, t.vm_type)
+pub struct PrimitiveTaggedType {
+    pub tag: Tag,
+    pub t: PrimitiveType,
+}
+
+fn report_not_user(t: &PrimitiveTaggedType) -> String {
+    format!("{} of {:?} is not a user primitive type", t.tag, t.t)
 }
 
 pub struct PrimitiveTypeChecker<C: HasTypeCheckerCtx> {
@@ -16,55 +21,68 @@ impl<C: HasTypeCheckerCtx> PrimitiveTypeChecker<C> {
     fn report_if(
         mut self,
         cond: impl FnOnce(PrimitiveType) -> bool,
-        report: impl FnOnce(TaggedType) -> TypeError,
-    ) -> C {
+        report: impl FnOnce(PrimitiveTaggedType) -> TypeError,
+    ) -> Self {
         match self.t {
             Some(p) if cond(p) => {
-                let tagged = VmType::Primitive(p).tag(self.tag);
+                let tagged = PrimitiveTaggedType {
+                    t: p,
+                    tag: self.tag.clone(),
+                };
                 let err = report(tagged);
-                self.ctx.ctx().report(err);
+
+                self.ctx.root_ctx().report(err);
             }
             _ => {}
         }
-        self.ctx
+        PrimitiveTypeChecker {
+            tag: self.tag,
+            t: self.t,
+            ctx: self.ctx,
+        }
     }
 
-    pub fn one_of(self, types: &[PrimitiveType]) -> C {
+    pub fn one_of(self, types: &[PrimitiveType]) -> Self {
         self.report_if(
             |t| !types.contains(&t),
-            |t| TypeError::NotOneOf(t, types.iter().map(|&p| VmType::Primitive(p)).collect()),
+            |t| {
+                TypeError::NotOneOf(
+                    t.into(),
+                    types.iter().map(|&p| VmType::Primitive(p)).collect(),
+                )
+            },
         )
     }
 
-    pub fn equals(self, p: PrimitiveType) -> C {
+    pub fn equals(self, p: PrimitiveType) -> Self {
         self.report_if(
             |t| t != p,
-            |t| TypeError::NotEquals(t, VmType::Primitive(p)),
+            |t| TypeError::NotEquals(t.into(), VmType::Primitive(p)),
         )
     }
 
     pub fn cond(
         self,
         cond: impl FnOnce(PrimitiveType) -> bool,
-        format: impl FnOnce(&TaggedType) -> String,
-    ) -> C {
+        format: impl FnOnce(&PrimitiveTaggedType) -> String,
+    ) -> Self {
         self.report_if(
             |t| !cond(t),
             |t| {
-                let formatted = format(&t);
-                TypeError::Condition(t, formatted)
+                let fmt = format(&t);
+                TypeError::Condition(t.into(), fmt)
             },
         )
     }
 
-    pub fn user(self) -> C {
-        self.cond(|t| t.is_user(), report_not_user)
+    pub fn user(self) -> Self {
+        self.cond(PrimitiveType::is_user, report_not_user)
     }
 
-    pub fn integer(self) -> C {
+    pub fn integer(self) -> Self {
         self.cond(
             |t| t.is_integer(),
-            |t| format!("<{}>{:?} is not integer", t.tag, t.vm_type),
+            |t| format!("<{}>{:?} is not integer", t.tag, t.t),
         )
     }
 
@@ -83,12 +101,16 @@ impl<C: HasTypeCheckerCtx> PrimitiveTypeChecker<C> {
         }
     }
 
-    pub fn bool(self) -> C {
+    pub fn bool(self) -> Self {
         self.equals(PrimitiveType::Bool)
     }
 
-    pub fn float(self) -> C {
+    pub fn float(self) -> Self {
         self.one_of(&[PrimitiveType::F64, PrimitiveType::F32])
+    }
+
+    pub fn and(self) -> C {
+        self.ctx
     }
 
     pub fn along_with(
@@ -104,6 +126,16 @@ impl<C: HasTypeCheckerCtx> PrimitiveTypeChecker<C> {
     }
 }
 
+impl<C: HasTypeCheckerCtx> PrimitiveTypeChecker<PrimitiveEitherTypeChecker<C>> {
+    pub fn or(self) -> PrimitiveTypeChecker<PrimitiveEitherTypeChecker<C>> {
+        PrimitiveTypeChecker {
+            tag: self.tag,
+            t: self.ctx.error.as_ref().and(self.t),
+            ctx: self.ctx,
+        }
+    }
+}
+
 pub struct PrimitiveEitherTypeChecker<C: HasTypeCheckerCtx> {
     tag: Tag,
     t: Option<PrimitiveType>,
@@ -112,17 +144,9 @@ pub struct PrimitiveEitherTypeChecker<C: HasTypeCheckerCtx> {
 }
 
 impl<C: HasTypeCheckerCtx> PrimitiveEitherTypeChecker<C> {
-    pub fn or(self) -> PrimitiveTypeChecker<Self> {
-        let t = if self.error.is_none() { None } else { self.t };
-        PrimitiveTypeChecker {
-            tag: self.tag.clone(),
-            t,
-            ctx: self,
-        }
-    }
     pub fn and(mut self) -> C {
         if let Some(e) = self.error {
-            self.ctx.ctx().report(e)
+            self.ctx.root_ctx().report(e)
         }
         self.ctx
     }
@@ -131,7 +155,9 @@ impl<C: HasTypeCheckerCtx> PrimitiveEitherTypeChecker<C> {
         if let (Some(e), Some(t)) = (self.error, self.t) {
             let tagged = VmType::from(t).tag(self.tag);
             let format = format(&e, &tagged);
-            self.ctx.ctx().report(TypeError::From(Box::new(e), format));
+            self.ctx
+                .root_ctx()
+                .report(TypeError::From(Box::new(e), format));
         }
         self.ctx
     }
@@ -140,8 +166,8 @@ impl<C: HasTypeCheckerCtx> PrimitiveEitherTypeChecker<C> {
 impl<C: HasTypeCheckerCtx> HasTypeCheckerCtx for PrimitiveEitherTypeChecker<C> {
     type Unwrapped = ();
 
-    fn ctx(&mut self) -> &mut TypeCheckerCtx {
-        self.ctx.ctx()
+    fn root_ctx(&mut self) -> &mut TypeCheckerCtx {
+        self.ctx.root_ctx()
     }
 
     fn unwrap(self) -> Self::Unwrapped {}
@@ -167,6 +193,29 @@ impl<C: HasTypeCheckerCtx> CombinedPrimitiveTypesChecker<C> {
         }
     }
 
+    pub fn are(
+        mut self,
+        cond: impl Fn(
+            PrimitiveTypeChecker<TypeCheckerCtx>,
+        ) -> PrimitiveTypeChecker<TypeCheckerCtx>,
+    ) -> C {
+        for (tag, t) in &mut self.types {
+            if let Some(to_check) = t {
+                let ctx = TypeCheckerCtx::new();
+                let ch = PrimitiveTypeChecker {
+                    tag: (*tag).clone(),
+                    t: Some(*to_check),
+                    ctx,
+                };
+                let ctx = cond(ch).and();
+                for e in ctx.errors {
+                    self.ctx.report(e);
+                }
+            }
+        }
+        self.ctx
+    }
+
     pub fn are_same(mut self) -> Self {
         let mut errors = Vec::new();
         self.types
@@ -181,7 +230,7 @@ impl<C: HasTypeCheckerCtx> CombinedPrimitiveTypesChecker<C> {
                 Some(n)
             });
         if !errors.is_empty() {
-            self.ctx.ctx().report(TypeError::AllNotEqual(errors))
+            self.ctx.root_ctx().report(TypeError::AllNotEqual(errors))
         }
         self
     }
@@ -210,7 +259,7 @@ impl AllSamePrimitiveTypeChecker<'_> {
 impl HasTypeCheckerCtx for AllSamePrimitiveTypeChecker<'_> {
     type Unwrapped = PrimitiveType;
 
-    fn ctx(&mut self) -> &mut TypeCheckerCtx {
+    fn root_ctx(&mut self) -> &mut TypeCheckerCtx {
         self.ctx
     }
 
@@ -231,7 +280,7 @@ impl<'c> ThreePrimitiveTypesChecker<'c> {
     pub fn all_same(mut self) -> AllSamePrimitiveTypeChecker<'c> {
         if let (Some(result), Some(op1), Some(op2)) = (self.result, self.op1, self.op2) {
             if result != op1 || result != op2 || op1 != op2 {
-                self.ctx().report(TypeError::ThreeNotEqual(
+                self.root_ctx().report(TypeError::ThreeNotEqual(
                     VmType::Primitive(result).tag(tags::RESULT),
                     VmType::Primitive(op1).tag(tags::OP1),
                     VmType::Primitive(op2).tag(tags::OP2),
@@ -239,7 +288,7 @@ impl<'c> ThreePrimitiveTypesChecker<'c> {
             }
         }
         AllSamePrimitiveTypeChecker {
-            tag: format!("{}, {}, {}", tags::RESULT, tags::OP1, tags::OP2).into(),
+            tag: tags::RESULT_OP1_OP2.into(),
             t: self.result,
             ctx: self.ctx,
         }
@@ -281,7 +330,7 @@ impl<'c> ThreePrimitiveTypesChecker<'c> {
 impl<'c> HasTypeCheckerCtx for ThreePrimitiveTypesChecker<'c> {
     type Unwrapped = ThreePrimitiveTypes;
 
-    fn ctx(&mut self) -> &mut TypeCheckerCtx {
+    fn root_ctx(&mut self) -> &mut TypeCheckerCtx {
         self.ctx
     }
 
@@ -327,7 +376,7 @@ impl<'c> TwoPrimitiveTypesChecker<'c> {
     pub fn all_same(mut self) -> AllSamePrimitiveTypeChecker<'c> {
         if let (Some(result), Some(op)) = (self.result, self.op) {
             if result != op {
-                self.ctx().report(TypeError::TwoNotEqual(
+                self.root_ctx().report(TypeError::TwoNotEqual(
                     VmType::Primitive(result).tag(tags::RESULT),
                     VmType::Primitive(op).tag(tags::OP),
                 ));
@@ -366,8 +415,8 @@ impl TwoPrimitiveMergedTypesChecker<'_> {
 impl HasTypeCheckerCtx for TwoPrimitiveTypesChecker<'_> {
     type Unwrapped = TwoPrimitiveTypes;
 
-    fn ctx(&mut self) -> &mut TypeCheckerCtx {
-        self.ctx.ctx()
+    fn root_ctx(&mut self) -> &mut TypeCheckerCtx {
+        self.ctx.root_ctx()
     }
 
     fn unwrap(self) -> Self::Unwrapped {
@@ -381,7 +430,7 @@ impl HasTypeCheckerCtx for TwoPrimitiveTypesChecker<'_> {
 impl HasTypeCheckerCtx for TwoPrimitiveMergedTypesChecker<'_> {
     type Unwrapped = TwoPrimitiveTypes;
 
-    fn ctx(&mut self) -> &mut TypeCheckerCtx {
+    fn root_ctx(&mut self) -> &mut TypeCheckerCtx {
         self.ctx
     }
 
@@ -419,7 +468,7 @@ impl<'c> PrimitiveOperandsTypeChecker<'c> {
     pub fn same(mut self) -> TwoPrimitiveMergedTypesChecker<'c> {
         if let (Some(op1), Some(op2)) = (self.op1, self.op2) {
             if op1 != op2 {
-                self.ctx().report(TypeError::TwoNotEqual(
+                self.root_ctx().report(TypeError::TwoNotEqual(
                     VmType::Primitive(op1).tag(tags::OP1),
                     VmType::Primitive(op2).tag(tags::OP2),
                 ));
@@ -435,12 +484,14 @@ impl<'c> PrimitiveOperandsTypeChecker<'c> {
     pub fn both_cond(
         self,
         cond: impl Fn(PrimitiveType) -> bool,
-        format: impl Fn(&TaggedType) -> String,
+        format: impl Fn(&PrimitiveTaggedType) -> String,
     ) -> ThreePrimitiveTypesChecker<'c> {
         self.op1()
             .cond(|t| cond(t), |t| format(t))
+            .and()
             .op2()
             .cond(|t| cond(t), |t| format(t))
+            .and()
             .ctx
     }
 }
@@ -448,8 +499,8 @@ impl<'c> PrimitiveOperandsTypeChecker<'c> {
 impl HasTypeCheckerCtx for PrimitiveOperandsTypeChecker<'_> {
     type Unwrapped = ThreePrimitiveTypes;
 
-    fn ctx(&mut self) -> &mut TypeCheckerCtx {
-        self.ctx.ctx()
+    fn root_ctx(&mut self) -> &mut TypeCheckerCtx {
+        self.ctx.root_ctx()
     }
 
     fn unwrap(self) -> Self::Unwrapped {

@@ -1,3 +1,4 @@
+use arrayvec::ArrayVec;
 use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::{FromPrimitive, ToPrimitive};
 
@@ -118,11 +119,19 @@ impl Opcode {
         }
     }
 
-    pub fn bytes(self) -> Vec<u8> {
-        match self.to_type() {
-            OpcodeType::Single(c) => vec![c],
-            OpcodeType::Double(c) => vec![u8::MAX, c],
+    pub fn bytes(self) -> ArrayVec<[u8; 2]> {
+        let mut vec = ArrayVec::new();
+        // SAFETY: safe as size of vec cannot exceed 2
+        unsafe {
+            match self.to_type() {
+                OpcodeType::Single(c) => vec.push_unchecked(c),
+                OpcodeType::Double(c) => {
+                    vec.push_unchecked(u8::MAX);
+                    vec.push_unchecked(c);
+                }
+            }
         }
+        vec
     }
 
     pub fn size(self) -> usize {

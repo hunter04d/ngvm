@@ -24,6 +24,7 @@ fn handle_cmp_op(
         .all_primitives()
         .result()
         .bool()
+        .and()
         .operands()
         .same()
         .get_vm()?;
