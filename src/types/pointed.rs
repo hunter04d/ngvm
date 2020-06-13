@@ -1,8 +1,11 @@
-use super::VmType;
+use std::fmt::{self, Display, Formatter};
+
+use crate::code::refs::StackRef;
 use crate::stack::data::{IntoPrimitive, StackData};
 use crate::vm::refs::LocatedRef;
 use crate::vm::ValueLocation;
-use std::fmt::{self, Display, Formatter};
+
+use super::VmType;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum PointedType {
@@ -77,7 +80,7 @@ impl RefType {
     pub fn locate(&self, ref_value: &StackData) -> LocatedRef {
         let index: usize = ref_value.into_primitive();
         match self.points_to {
-            RefLocation::Stack => LocatedRef::Stack(index),
+            RefLocation::Stack => LocatedRef::Stack(StackRef(index)),
             RefLocation::Heap => unimplemented!(),
             RefLocation::TransientOnStack => LocatedRef::Transient(ValueLocation::Stack(index)),
             RefLocation::TransientOnHeap => unreachable!(),

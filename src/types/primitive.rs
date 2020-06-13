@@ -1,6 +1,7 @@
 #![doc(hidden)]
 
 use num_derive::{FromPrimitive, ToPrimitive};
+
 #[repr(u8)]
 #[derive(Eq, PartialEq, Copy, Clone, Hash, ToPrimitive, FromPrimitive, Debug)]
 pub enum PrimitiveType {

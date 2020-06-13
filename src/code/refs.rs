@@ -1,9 +1,11 @@
-use serde::{Deserialize, Serialize};
 use std::mem::size_of;
+
+use serde::{Deserialize, Serialize};
+
 pub type Ref = usize;
 
 /// Type of the reference to a stack value in bytecode
-#[derive(Debug, Eq, PartialEq, Copy, Clone, Deserialize, Serialize)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash, Deserialize, Serialize)]
 #[serde(transparent)]
 pub struct StackRef(pub Ref);
 

@@ -1,4 +1,3 @@
-use super::AluExtensions;
 use crate::code::refs::refs_size;
 use crate::code::Chunk;
 use crate::error::VmError;
@@ -7,6 +6,8 @@ use crate::types::checker::{HasTypeCheckerCtx, TypeCheckerCtx};
 use crate::types::PrimitiveType;
 use crate::vm::VmRefSource;
 use crate::Vm;
+
+use super::AluExtensions;
 
 fn handle_bi_op(
     chunk: &Chunk,

@@ -1,10 +1,11 @@
 use std::ops;
 
+use num_traits::ops::checked as cops;
 use num_traits::PrimInt;
 
 use crate::operations::markers::*;
 use crate::operations::BiOp;
-use num_traits::ops::checked as cops;
+
 impl<T: ops::Shl<u32>> BiOp<Shl, u32> for T {
     type Output = T::Output;
 

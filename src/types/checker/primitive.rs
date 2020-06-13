@@ -86,6 +86,20 @@ impl<C: HasTypeCheckerCtx> PrimitiveTypeChecker<C> {
         )
     }
 
+    pub fn unsigned(self) -> Self {
+        self.cond(
+            |t| t.is_unsigned(),
+            |t| format!("<{}>{:?} is not an unsigned integer", t.tag, t.t),
+        )
+    }
+
+    pub fn signed(self) -> Self {
+        self.cond(
+            |t| t.is_signed(),
+            |t| format!("<{}>{:?} is not an unsigned integer", t.tag, t.t),
+        )
+    }
+
     pub fn either(self) -> PrimitiveTypeChecker<PrimitiveEitherTypeChecker<C>> {
         let ctx = self.ctx;
         let either = PrimitiveEitherTypeChecker {
@@ -123,6 +137,18 @@ impl<C: HasTypeCheckerCtx> PrimitiveTypeChecker<C> {
             types: vec![(self.tag, self.t), (other_checker.tag, other_checker.t)],
             ctx: other_checker.ctx,
         }
+    }
+}
+
+impl<C: HasTypeCheckerCtx> HasTypeCheckerCtx for PrimitiveTypeChecker<C> {
+    type Unwrapped = PrimitiveType;
+
+    fn root_ctx(&mut self) -> &mut TypeCheckerCtx {
+        self.ctx.root_ctx()
+    }
+
+    fn unwrap(self) -> Self::Unwrapped {
+        self.t.unwrap()
     }
 }
 
@@ -195,9 +221,7 @@ impl<C: HasTypeCheckerCtx> CombinedPrimitiveTypesChecker<C> {
 
     pub fn are(
         mut self,
-        cond: impl Fn(
-            PrimitiveTypeChecker<TypeCheckerCtx>,
-        ) -> PrimitiveTypeChecker<TypeCheckerCtx>,
+        cond: impl Fn(PrimitiveTypeChecker<TypeCheckerCtx>) -> PrimitiveTypeChecker<TypeCheckerCtx>,
     ) -> C {
         for (tag, t) in &mut self.types {
             if let Some(to_check) = t {

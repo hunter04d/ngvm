@@ -32,6 +32,22 @@ impl VmType {
         }
     }
 
+    pub fn s_arr(&self) -> Option<&SArrType> {
+        if let PointedType::SArr(arr) = self.pointed()? {
+            Some(arr)
+        } else {
+            None
+        }
+    }
+
+    pub fn ref_type(&self) -> Option<&RefType> {
+        if let PointedType::Ref(rf) = self.pointed()? {
+            Some(rf)
+        } else {
+            None
+        }
+    }
+
     pub fn size(&self) -> usize {
         match self {
             VmType::Primitive(p) => p.size(),
@@ -50,6 +66,16 @@ impl VmType {
     }
 }
 
+pub trait HasVmType {
+    fn vm_type(&self) -> &VmType;
+}
+
+impl HasVmType for VmType {
+    fn vm_type(&self) -> &VmType {
+        self
+    }
+}
+
 impl From<PrimitiveType> for VmType {
     fn from(obj: PrimitiveType) -> Self {
         VmType::Primitive(obj)
@@ -59,6 +85,18 @@ impl From<PrimitiveType> for VmType {
 impl From<PointedType> for VmType {
     fn from(obj: PointedType) -> Self {
         VmType::PointedType(Box::new(obj))
+    }
+}
+
+impl From<RefType> for VmType {
+    fn from(obj: RefType) -> Self {
+        VmType::PointedType(Box::new(PointedType::Ref(obj)))
+    }
+}
+
+impl From<SArrType> for VmType {
+    fn from(obj: SArrType) -> Self {
+        VmType::PointedType(Box::new(PointedType::SArr(obj)))
     }
 }
 

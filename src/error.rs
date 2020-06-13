@@ -1,9 +1,11 @@
+use thiserror::Error;
+
 use crate::code::refs::StackRef;
 use crate::opcodes::Opcode;
 use crate::types::checker::{TaggedType, TypeError};
 use crate::types::RefKind;
 use crate::vm::lock::LockError;
-use thiserror::Error;
+use crate::vm::ValueLocation;
 
 /// Represents an error that originated inside the vm internal logic
 #[derive(Error, Debug)]
@@ -32,7 +34,7 @@ pub enum VmError {
     RefToTemp(RefKind, StackRef),
 
     #[error("{0} (@{1:?})")]
-    LockError(LockError, StackRef),
+    LockError(LockError, ValueLocation),
     #[error("Use of moved value @{}", (.0).0)]
     UseOfMovedValue(StackRef),
 }

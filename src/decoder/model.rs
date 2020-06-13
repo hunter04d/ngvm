@@ -1,8 +1,10 @@
-use crate::code::refs::{refs_size, CodeRef};
-use crate::opcodes::Opcode;
-use smallvec::SmallVec;
 use std::borrow::Cow;
 use std::fmt::{self, Display, Formatter};
+
+use smallvec::SmallVec;
+
+use crate::code::refs::{refs_size, CodeRef};
+use crate::opcodes::Opcode;
 
 /// The result of the decoding the input stream
 pub struct DecodedOpcode {

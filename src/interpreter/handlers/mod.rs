@@ -1,8 +1,9 @@
-use super::stack_tracer::StackTracer;
 use crate::code::refs::refs_size;
 use crate::code::Chunk;
 use crate::error::VmError;
 use crate::vm::{Vm, VmRefSource};
+
+use super::stack_tracer::StackTracer;
 
 pub(in crate::interpreter) mod alu;
 pub(in crate::interpreter) mod array;

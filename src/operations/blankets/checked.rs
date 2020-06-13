@@ -1,6 +1,7 @@
+use num_traits::ops::checked as cops;
+
 use super::super::markers::*;
 use super::super::{BiOp, UOp};
-use num_traits::ops::checked as cops;
 
 impl<T: cops::CheckedAdd> BiOp<CheckedAdd> for T {
     type Output = Option<T::Output>;

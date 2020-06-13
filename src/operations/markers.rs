@@ -1,6 +1,7 @@
 //! Markers for the operations.
 
 use super::{BiOpMarker, UOpMarker};
+
 macro_rules! gen_markers {
     ($($t: ident),* $(,)?) => {
         $(

@@ -1,8 +1,8 @@
+use std::convert::TryInto;
 use std::mem::size_of;
 
 use crate::code::refs::PoolRef;
 use crate::types::PrimitiveType;
-use std::convert::TryInto;
 
 #[derive(Debug)]
 pub enum Constant {

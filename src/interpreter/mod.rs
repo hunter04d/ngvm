@@ -5,7 +5,9 @@ use handlers::{
 
 use crate::code::Chunk;
 use crate::error::VmError;
-use crate::interpreter::handlers::array::handle_s_arr_create_0;
+use crate::interpreter::handlers::array::{
+    handle_s_arr_create_0, handle_s_arr_get, handle_s_arr_mut,
+};
 use crate::Vm;
 
 pub mod handlers;
@@ -95,8 +97,8 @@ pub(crate) static HANDLERS: [IntHandler; 256] = [
     noop,                     // 78
     noop,                     // 79
     handle_s_arr_create_0,    // 80
-    noop,                     // 81
-    noop,                     // 82
+    handle_s_arr_get,         // 81
+    handle_s_arr_mut,         // 82
     noop,                     // 83
     noop,                     // 84
     noop,                     // 85

@@ -1,19 +1,20 @@
 use std::collections::HashMap;
 
+use lock::ValueLock;
+pub use refs::code::VmRefSource;
+use refs::LocatedRef;
+
 use crate::code::refs::StackRef;
 use crate::error::VmError;
 use crate::meta::{Meta, StackMeta, TransientMeta};
 use crate::stack::data::IntoStackData;
 use crate::stack::data::StackData;
 use crate::types::{PointedType, PrimitiveType, RefKind, RefLocation, RefType, VmType};
+use crate::vm::lock::ValueLockData;
 use crate::{ConstantPool, Module};
-use lock::ValueLock;
-use refs::LocatedRef;
 
 pub mod lock;
 pub mod refs;
-
-pub use refs::code::VmRefSource;
 
 pub struct Vm {
     /// vm stack values
@@ -134,6 +135,7 @@ impl Vm {
         Ok(&mut self.stack[from..until])
     }
 
+    #[deprecated(note = "use push_single_typed instead")]
     pub fn push_primitive(&mut self, value: StackData, t: PrimitiveType) {
         let len = self.stack.len();
         let cycle = self.current_cycle();
@@ -143,8 +145,17 @@ impl Vm {
         self.stack.push(value);
     }
 
+    pub fn push_single_typed(&mut self, value: impl IntoStackData, t: impl Into<VmType>) {
+        let len = self.stack.len();
+        let cycle = self.current_cycle();
+        let meta = StackMeta::new(t, StackDataRef(len), cycle);
+
+        self.stack_metadata.push(meta);
+        self.stack.push(value.into_stack_data());
+    }
+
     pub fn push_primitive_zeroed(&mut self, t: PrimitiveType) {
-        self.push_primitive(Default::default(), t)
+        self.push_single_typed(StackData::default(), t)
     }
 
     pub fn push_stack_ref(&mut self, index: StackRef, kind: RefKind) -> Result<(), VmError> {
@@ -161,7 +172,7 @@ impl Vm {
                 self.stack.push(index.0.into_stack_data());
                 Ok(())
             }
-            Err(e) => Err(VmError::LockError(e, index)),
+            Err(e) => Err(VmError::LockError(e, ValueLocation::Stack(index.0))),
         }
     }
 
@@ -215,7 +226,7 @@ impl Vm {
         let vm_cycle = self.cycle;
         match rf {
             LocatedRef::Stack(index) => {
-                let value_meta = self.stack_metadata_mut(StackRef(index))?;
+                let value_meta = self.stack_metadata_mut(index)?;
                 if let Some(c) = value_meta.lock.lock_cycle() {
                     if c == vm_cycle {
                         value_meta.lock = ValueLock::None;
@@ -242,8 +253,11 @@ impl Vm {
     pub fn switch_lock_cycle(&mut self, rf: LocatedRef) -> Result<(), VmError> {
         fn switch_cycle(m: &mut impl Meta, new_cycle: usize) -> Result<(), VmError> {
             match m.lock() {
-                ValueLock::Mut(current_cycle) if new_cycle >= *current_cycle => {
-                    *m.lock_mut() = ValueLock::Mut(new_cycle);
+                ValueLock::Mut(data) if new_cycle >= data.lock_cycle => {
+                    *m.lock_mut() = ValueLock::Mut(ValueLockData {
+                        lock_cycle: new_cycle,
+                        partial_lock: false,
+                    });
                     Ok(())
                 }
                 // TODO: different error
@@ -254,7 +268,7 @@ impl Vm {
         let vm_cycle = self.cycle;
         match rf {
             LocatedRef::Stack(index) => {
-                let value_meta = self.stack_metadata_mut(StackRef(index))?;
+                let value_meta = self.stack_metadata_mut(index)?;
                 switch_cycle(value_meta, vm_cycle)
             }
             LocatedRef::Transient(index) => {
@@ -281,18 +295,24 @@ impl Vm {
         }
     }
 
-    pub fn stack_meta_of_type(&self, t: VmType) -> StackMeta {
+    pub fn new_stack_meta_of_type(&self, t: VmType) -> StackMeta {
         let cycle = self.current_cycle();
         let len = self.stack.len();
         StackMeta::new(t, StackDataRef(len), cycle)
     }
 
-    pub fn push_deref(&mut self, value: &[StackData], t: VmType, kind: RefKind, rf: StackRef) {
+    pub fn push_deref(
+        &mut self,
+        value: impl IntoIterator<Item = StackData>,
+        t: VmType,
+        kind: RefKind,
+        rf: StackRef,
+    ) {
         let len = self.stack_metadata.len();
-        let mut meta = self.stack_meta_of_type(t);
+        let mut meta = self.new_stack_meta_of_type(t);
         meta.deref = kind.into();
         self.stack_metadata.push(meta);
-        self.stack.extend_from_slice(value);
+        self.stack.extend(value);
         self.derefs.push(VmDeref {
             rf,
             deref: StackRef(len),
@@ -308,7 +328,7 @@ impl Vm {
                 let deref_data = self.stack_data(d.deref)?.to_vec();
                 match lr {
                     LocatedRef::Stack(index) => {
-                        let from = index;
+                        let from = index.0;
                         let until = from + pointer_size;
                         self.stack.splice(from..until, deref_data);
                     }
@@ -343,14 +363,14 @@ impl Vm {
     pub fn push_array_0(&mut self, size: usize, t: PrimitiveType) {
         let arr_type = PointedType::s_arr(t, size);
         let stack_size = arr_type.size();
-        let meta = self.stack_meta_of_type(arr_type.into());
+        let meta = self.new_stack_meta_of_type(arr_type.into());
         self.stack_metadata.push(meta);
         self.stack
             .extend(std::iter::repeat(StackData::default()).take(stack_size))
     }
 
     pub fn push_s_str(&mut self, ptr: usize, len: usize) {
-        let meta = self.stack_meta_of_type(PrimitiveType::SStr.into());
+        let meta = self.new_stack_meta_of_type(PrimitiveType::SStr.into());
         self.stack_metadata.push(meta);
         self.stack.push(ptr.into_stack_data());
         self.stack.push(len.into_stack_data());
@@ -385,6 +405,12 @@ impl Default for Vm {
 pub enum ValueLocation {
     Stack(usize),
     Heap(*const ()),
+}
+
+impl From<StackDataRef> for ValueLocation {
+    fn from(obj: StackDataRef) -> Self {
+        ValueLocation::Stack(obj.0)
+    }
 }
 
 #[derive(Debug)]

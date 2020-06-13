@@ -1,5 +1,5 @@
 use crate::types::checker::{Tag, TypeChecker, TypeCheckerCtx};
-use crate::types::VmType;
+use crate::types::{HasVmType, VmType};
 use crate::vm::lock::{DerefLock, ValueLock};
 use crate::vm::refs::LocatedRef;
 use crate::vm::StackDataRef;
@@ -28,14 +28,12 @@ impl StackMeta {
     }
 }
 
-pub trait Meta {
-    fn vm_type(&self) -> &VmType;
-
+pub trait Meta: HasVmType {
     fn lock(&self) -> &ValueLock;
 
     fn lock_mut(&mut self) -> &mut ValueLock;
 
-    fn check<'a, 'c>(
+    fn check_with<'a, 'c>(
         &'a self,
         tag: impl Into<Tag>,
         ctx: &'c mut TypeCheckerCtx,
@@ -46,19 +44,28 @@ pub trait Meta {
             ctx,
         }
     }
+
+    fn check(&self, tag: impl Into<Tag>) -> TypeChecker<TypeCheckerCtx> {
+        TypeChecker {
+            tag: tag.into(),
+            vm_type: Some(self.vm_type()),
+            ctx: TypeCheckerCtx::new(),
+        }
+    }
 }
 
 impl Meta for StackMeta {
-    fn vm_type(&self) -> &VmType {
-        &self.value_type
-    }
-
     fn lock(&self) -> &ValueLock {
         &self.lock
     }
 
     fn lock_mut(&mut self) -> &mut ValueLock {
         &mut self.lock
+    }
+}
+impl HasVmType for StackMeta {
+    fn vm_type(&self) -> &VmType {
+        &self.value_type
     }
 }
 
@@ -71,15 +78,17 @@ pub struct TransientMeta {
 }
 
 impl Meta for TransientMeta {
-    fn vm_type(&self) -> &VmType {
-        &self.value_type
-    }
-
     fn lock(&self) -> &ValueLock {
         &self.lock
     }
 
     fn lock_mut(&mut self) -> &mut ValueLock {
         &mut self.lock
+    }
+}
+
+impl HasVmType for TransientMeta {
+    fn vm_type(&self) -> &VmType {
+        &self.value_type
     }
 }

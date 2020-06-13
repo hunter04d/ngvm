@@ -1,6 +1,7 @@
-use super::{HasTypeCheckerCtx, Tag, TypeChecker, TypeCheckerCtx, TypeError};
 use crate::types::checker::Taggable;
 use crate::types::{PointedType, RefType, SArrType, VmType};
+
+use super::{HasTypeCheckerCtx, Tag, TypeChecker, TypeCheckerCtx, TypeError};
 
 pub struct RefTypeChecker<'a, C: HasTypeCheckerCtx> {
     pub(super) ref_type: Option<&'a RefType>,
@@ -31,6 +32,10 @@ impl<'a, C: HasTypeCheckerCtx> SArrTypeChecker<'a, C> {
             vm_type: self.arr_type.map(|r| &r.pointer),
             ctx: self,
         }
+    }
+
+    pub fn and(self) -> C {
+        self.ctx
     }
 
     pub fn with_len(

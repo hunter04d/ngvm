@@ -1,16 +1,17 @@
 use smallvec::alloc::borrow::Cow;
 
+use pointed::{RefTypeChecker, SArrTypeChecker};
+use primitive::PrimitiveTaggedType;
 pub use primitive::ThreePrimitiveTypesChecker;
+use primitive::{PrimitiveTypeChecker, TwoPrimitiveTypesChecker};
 
 use crate::error::VmError;
 use crate::types::{PointedType, RefKind, VmType};
-use pointed::{RefTypeChecker, SArrTypeChecker};
-use primitive::PrimitiveTaggedType;
-use primitive::{PrimitiveTypeChecker, TwoPrimitiveTypesChecker};
 
 mod pointed;
 mod primitive;
 pub mod tags;
+
 #[derive(Debug)]
 pub struct TypeCheckerCtx {
     errors: Vec<TypeError>,
@@ -18,6 +19,21 @@ pub struct TypeCheckerCtx {
 
 pub trait TypeCheckerCtxProvider {
     fn type_checker_ctx() -> TypeCheckerCtx;
+}
+
+pub fn combine_checks<T1, T2>(
+    r1: Result<T1, Vec<TypeError>>,
+    r2: Result<T2, Vec<TypeError>>,
+) -> Result<(T1, T2), Vec<TypeError>> {
+    match (r1, r2) {
+        (Ok(r1), Ok(r2)) => Ok((r1, r2)),
+        (Err(e1), Ok(_)) => Err(e1),
+        (Ok(_), Err(e2)) => Err(e2),
+        (Err(mut e1), Err(e2)) => Err({
+            e1.extend(e2);
+            e1
+        }),
+    }
 }
 
 pub trait HasTypeCheckerCtx: Sized {
@@ -59,6 +75,7 @@ impl TypeCheckerCtxProvider for TypeCheckerCtx {
         Self::new()
     }
 }
+
 impl Default for TypeCheckerCtx {
     fn default() -> Self {
         Self { errors: Vec::new() }
@@ -176,6 +193,31 @@ pub enum TypeError {
     NotMutReference(TaggedType),
 }
 
+#[derive(Debug, Copy, Clone)]
+pub enum RefCondition {
+    Ref,
+    Mut,
+    Any,
+}
+
+impl RefCondition {
+    fn get_error(&self, t: TaggedType) -> TypeError {
+        match self {
+            RefCondition::Ref => TypeError::NotReference(t),
+            RefCondition::Mut => TypeError::NotMutReference(t),
+            RefCondition::Any => TypeError::NotReference(t),
+        }
+    }
+
+    fn satisfies(&self, ref_kind: RefKind) -> bool {
+        match self {
+            RefCondition::Ref => matches!(ref_kind, RefKind::Ref),
+            RefCondition::Mut => matches!(ref_kind, RefKind::Mut),
+            RefCondition::Any => true,
+        }
+    }
+}
+
 impl<'a, C: HasTypeCheckerCtx> TypeChecker<'a, C> {
     pub fn primitive(mut self) -> PrimitiveTypeChecker<C> {
         let p = match self.vm_type {
@@ -194,22 +236,28 @@ impl<'a, C: HasTypeCheckerCtx> TypeChecker<'a, C> {
         }
     }
 
-    pub fn any_ref(mut self) -> RefTypeChecker<'a, C> {
+    pub fn of_ref(mut self, cond: RefCondition) -> RefTypeChecker<'a, C> {
         let r = match self.vm_type {
             None => None,
             Some(VmType::PointedType(bpt)) => {
                 if let PointedType::Ref(r) = bpt.as_ref() {
+                    if !cond.satisfies(r.kind) {
+                        let t = VmType::from(r.clone());
+                        let err = cond.get_error(t.tag(self.tag.clone()));
+                        self.ctx.report(err);
+                    }
                     Some(r)
                 } else {
                     None
                 }
             }
             Some(t) => {
-                self.ctx
-                    .report(TypeError::NotReference(t.tag(self.tag.clone())));
+                let err = cond.get_error(t.tag(self.tag.clone()));
+                self.ctx.report(err);
                 None
             }
         };
+        // TODO: poison the type to continue the type check
         RefTypeChecker {
             ref_type: r,
             tag: self.tag,
@@ -217,32 +265,19 @@ impl<'a, C: HasTypeCheckerCtx> TypeChecker<'a, C> {
         }
     }
 
-    pub fn mut_ref(mut self) -> RefTypeChecker<'a, C> {
-        let r = match self.vm_type {
-            None => None,
-            Some(VmType::PointedType(bpt)) => {
-                if let PointedType::Ref(r) = bpt.as_ref() {
-                    if matches!(r.kind, RefKind::Mut) {
-                        Some(r)
-                    } else {
-                        let t = VmType::PointedType(bpt.clone());
-                        self.report(TypeError::NotMutReference(t.tag(self.tag.clone())));
-                        None
-                    }
-                } else {
-                    None
-                }
-            }
-            Some(t) => {
-                self.report(TypeError::NotMutReference(t.tag(self.tag.clone())));
-                None
-            }
-        };
-        RefTypeChecker {
-            ref_type: r,
-            tag: self.tag,
-            ctx: self.ctx,
-        }
+    /// Checks that the type is some kind of reference
+    pub fn any_ref(self) -> RefTypeChecker<'a, C> {
+        self.of_ref(RefCondition::Any)
+    }
+
+    /// Checks that the type is a *Mut* reference
+    pub fn mut_ref(self) -> RefTypeChecker<'a, C> {
+        self.of_ref(RefCondition::Mut)
+    }
+
+    /// Checks that the type is a *Ref* reference
+    pub fn ref_ref(self) -> RefTypeChecker<'a, C> {
+        self.of_ref(RefCondition::Ref)
     }
 
     pub fn s_arr(mut self) -> SArrTypeChecker<'a, C> {

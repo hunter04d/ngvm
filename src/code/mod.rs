@@ -3,6 +3,7 @@ use std::mem::size_of;
 use std::option::NoneError;
 
 pub use chunk::Chunk;
+use refs::{PoolRef, Ref, StackRef, ThreeStackRefs, TwoStackRefs};
 
 use crate::decoder::{DecodedOpcode, HANDLERS as D_HANDLERS};
 use crate::error::VmContextError;
@@ -10,7 +11,6 @@ use crate::interpreter::HANDLERS as I_HANDLERS;
 use crate::model;
 use crate::model::ToBytesCtx;
 use crate::Vm;
-use refs::{PoolRef, Ref, StackRef, ThreeStackRefs, TwoStackRefs};
 
 mod chunk;
 pub mod refs;

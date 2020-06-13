@@ -1,6 +1,8 @@
 use std::convert::TryInto;
 use std::mem::size_of;
 
+use crate::vm::ValueLocation;
+
 /// Data type of the stack data
 pub(crate) type StackData = [u8; 8];
 
@@ -12,7 +14,7 @@ pub(crate) trait FromDouble<T> {
     fn from_double(obj: T) -> Self;
 }
 
-pub(crate) trait FromPrimitive<T> {
+pub trait FromPrimitive<T> {
     fn from_primitive(obj: T) -> Self;
 }
 
@@ -21,7 +23,7 @@ pub(crate) trait IntoPrimitive<T> {
     fn into_primitive(self) -> T;
 }
 
-pub(crate) trait IntoStackData {
+pub trait IntoStackData {
     fn into_stack_data(self) -> StackData;
 }
 
@@ -54,6 +56,15 @@ impl FromSingle<StackData> for char {
     }
 }
 
+impl FromPrimitive<ValueLocation> for StackData {
+    fn from_primitive(obj: ValueLocation) -> Self {
+        match obj {
+            ValueLocation::Stack(sr) => StackData::from_primitive(sr),
+            ValueLocation::Heap(hr) => StackData::from_primitive(hr as usize),
+        }
+    }
+}
+
 /// Generic impl of this type
 impl<T: FromSingle<StackData>> IntoPrimitive<T> for StackData {
     fn into_primitive(self) -> T {
@@ -82,6 +93,12 @@ where
 {
     fn into_stack_data(self) -> StackData {
         StackData::from_primitive(self)
+    }
+}
+
+impl IntoStackData for StackData {
+    fn into_stack_data(self) -> StackData {
+        self
     }
 }
 

@@ -1,11 +1,11 @@
 use std::fmt::{self, Debug, Formatter};
+use std::ops::Deref;
+use std::slice::from_raw_parts;
+use std::str::from_utf8_unchecked;
 
 use crate::meta::StackMeta;
 use crate::stack::data::{FromSingle, IntoPrimitive, StackData};
 use crate::types::{PointedType, PrimitiveType, VmType};
-use std::ops::Deref;
-use std::slice::from_raw_parts;
-use std::str::from_utf8_unchecked;
 
 /// Traces the stack value contained in a slice of stack data
 pub struct StackTracer<'a>(pub &'a [StackData], pub &'a StackMeta);
@@ -51,7 +51,18 @@ impl<'a> Debug for StackTracer<'a> {
                 VmType::PointedType(p) => {
                     match p.deref() {
                         PointedType::SArr(a) => {
-                            s.field("data", &"<S Arr>");
+                            if let Some(p) = a.pointer.primitive() {
+                                let vec = self
+                                    .0
+                                    .iter()
+                                    .map(|v| display_of_primitive(p, *v))
+                                    .collect::<Vec<_>>();
+                                s.field("data", &vec);
+                            } else {
+                                s.field("data", &"<S Arr>");
+                            }
+                            // TODO: better display for arrays
+
                             s.field("type", &format!("[{:?};{}]", a.pointer, a.len));
                         }
                         PointedType::Ref(r) => {
@@ -64,8 +75,37 @@ impl<'a> Debug for StackTracer<'a> {
                 }
             }
         } else {
-            s.field("data", &data_0);
+            let data = self
+                .0
+                .iter()
+                .flatten()
+                .map(|v| format!("{:02x}", v))
+                .collect::<Vec<_>>()
+                .join("");
+            s.field("data", &data);
         }
         s.finish()
+    }
+}
+
+fn display_of_primitive(p: PrimitiveType, data: StackData) -> Box<dyn Debug> {
+    match p {
+        PrimitiveType::Never => Box::new("(never!)"),
+        PrimitiveType::U64 => Box::new(u64::from_single(data)),
+        PrimitiveType::U32 => Box::new(u32::from_single(data)),
+        PrimitiveType::U16 => Box::new(u16::from_single(data)),
+        PrimitiveType::U8 => Box::new(u8::from_single(data)),
+        PrimitiveType::I64 => Box::new(i64::from_single(data)),
+        PrimitiveType::I32 => Box::new(i32::from_single(data)),
+        PrimitiveType::I16 => Box::new(i16::from_single(data)),
+        PrimitiveType::I8 => Box::new(i8::from_single(data)),
+        PrimitiveType::F32 => Box::new(f32::from_single(data)),
+        PrimitiveType::F64 => Box::new(f64::from_single(data)),
+        PrimitiveType::Bool => Box::new(bool::from_single(data)),
+        PrimitiveType::Char => Box::new(char::from_single(data)),
+        PrimitiveType::SStr => todo!(),
+        PrimitiveType::StackFrame => unimplemented!(),
+        PrimitiveType::ReturnAddr => unimplemented!(),
+        PrimitiveType::Unit => Box::new("(unit)"),
     }
 }

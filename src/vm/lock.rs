@@ -1,12 +1,18 @@
+use thiserror::Error;
+
 use crate::types::RefKind;
 
-use thiserror::Error;
+#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
+pub struct ValueLockData {
+    pub lock_cycle: usize,
+    pub partial_lock: bool,
+}
 
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
 pub enum ValueLock {
     None,
-    Ref(usize),
-    Mut(usize),
+    Ref(ValueLockData),
+    Mut(ValueLockData),
 }
 
 impl Default for ValueLock {
@@ -46,14 +52,16 @@ pub enum LockError {
     MutLockButMutLocked,
     #[error("Attempted to acquire a ref lock on a value, but value is already locked as mut")]
     RefLockButMutLocked,
+    #[error("Attempted to acquire a partial ref lock on a value, but value is already locked as fully as ref")]
+    RefPartialLockButRefFullLock,
 }
 
 impl ValueLock {
     pub fn lock_cycle(&self) -> Option<usize> {
         match self {
             ValueLock::None => None,
-            ValueLock::Ref(c) => Some(*c),
-            ValueLock::Mut(c) => Some(*c),
+            ValueLock::Ref(c) => Some(c.lock_cycle),
+            ValueLock::Mut(c) => Some(c.lock_cycle),
         }
     }
 
@@ -95,7 +103,10 @@ impl ValueLock {
     pub fn add_mut_lock(&mut self, current_cycle: usize) -> Result<(), LockError> {
         match self {
             ValueLock::None => {
-                *self = ValueLock::Mut(current_cycle);
+                *self = ValueLock::Mut(ValueLockData {
+                    lock_cycle: current_cycle,
+                    partial_lock: false,
+                });
                 Ok(())
             }
             ValueLock::Ref(_) => Err(LockError::MutLockButRefLocked),
@@ -106,7 +117,10 @@ impl ValueLock {
     pub fn add_ref_lock(&mut self, current_cycle: usize) -> Result<(), LockError> {
         match self {
             ValueLock::None => {
-                *self = ValueLock::Ref(current_cycle);
+                *self = ValueLock::Ref(ValueLockData {
+                    lock_cycle: current_cycle,
+                    partial_lock: false,
+                });
                 Ok(())
             }
             ValueLock::Ref(_) => Ok(()),
@@ -118,6 +132,47 @@ impl ValueLock {
         match ref_kind {
             RefKind::Mut => self.add_mut_lock(current_cycle),
             RefKind::Ref => self.add_ref_lock(current_cycle),
+        }
+    }
+
+    pub fn add_lock_partial(
+        &mut self,
+        current_cycle: usize,
+        ref_kind: RefKind,
+    ) -> Result<(), LockError> {
+        match ref_kind {
+            RefKind::Mut => self.add_mut_lock_partial(current_cycle),
+            RefKind::Ref => self.add_ref_lock_partial(current_cycle),
+        }
+    }
+
+    pub fn add_mut_lock_partial(&mut self, current_cycle: usize) -> Result<(), LockError> {
+        match self {
+            ValueLock::None => {
+                *self = ValueLock::Mut(ValueLockData {
+                    lock_cycle: current_cycle,
+                    partial_lock: true,
+                });
+                Ok(())
+            }
+            ValueLock::Mut(data) if data.partial_lock => Ok(()),
+            ValueLock::Mut(_) => Err(LockError::MutLockButMutLocked),
+            ValueLock::Ref(_) => Err(LockError::MutLockButRefLocked),
+        }
+    }
+
+    pub fn add_ref_lock_partial(&mut self, current_cycle: usize) -> Result<(), LockError> {
+        match self {
+            ValueLock::None => {
+                *self = ValueLock::Ref(ValueLockData {
+                    lock_cycle: current_cycle,
+                    partial_lock: true,
+                });
+                Ok(())
+            }
+            ValueLock::Ref(data) if data.partial_lock => Ok(()),
+            ValueLock::Ref(_) => Err(LockError::RefPartialLockButRefFullLock),
+            ValueLock::Mut(_) => Err(LockError::RefLockButMutLocked),
         }
     }
 }

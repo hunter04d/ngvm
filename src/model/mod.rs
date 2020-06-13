@@ -1,16 +1,17 @@
 //! This module contains types that represent VM as high level object model.
 
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::convert::TryInto;
+use std::iter::FromIterator;
 use std::mem::size_of;
+
+use serde::{Deserialize, Serialize};
+use smallvec::SmallVec;
 
 use Opcode::*;
 
 use crate::code::refs::*;
 use crate::opcodes::Opcode as Nc;
-use smallvec::SmallVec;
-use std::iter::FromIterator;
 
 /// Vm opcode represented as Rust enum (size constraints be dammed)
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -104,6 +105,14 @@ pub enum Opcode {
     EndDeref,
     Mv(StackRef, StackRef),
     SArrCreate0(usize, PoolRef),
+    SArrGet {
+        arr_ref: StackRef,
+        index: StackRef,
+    },
+    SArrMut {
+        arr_mut: StackRef,
+        index: StackRef,
+    },
     TraceStackValue(StackRef),
 }
 
@@ -166,46 +175,46 @@ impl Opcode {
             } => with_refs(Nc::LdType, &[type_location.0, value_location.0]),
             LdSS(p) => with_one_ref(Nc::LdSS, p.0),
             LdUnit => single(Nc::LdUnit),
-            UAdd(v) => with_three_refs(Nc::UAdd, v),
-            USub(v) => with_three_refs(Nc::USub, v),
-            UMul(v) => with_three_refs(Nc::UMul, v),
-            UDiv(v) => with_three_refs(Nc::UDiv, v),
-            URem(v) => with_three_refs(Nc::URem, v),
-            IAdd(v) => with_three_refs(Nc::IAdd, v),
-            ISub(v) => with_three_refs(Nc::ISub, v),
-            IMul(v) => with_three_refs(Nc::IMul, v),
-            IDiv(v) => with_three_refs(Nc::IDiv, v),
-            IRem(v) => with_three_refs(Nc::IRem, v),
-            INeg(v) => with_two_refs(Nc::INeg, v),
-            FAdd(v) => with_three_refs(Nc::FAdd, v),
-            FSub(v) => with_three_refs(Nc::FSub, v),
-            FMul(v) => with_three_refs(Nc::FMul, v),
-            FDiv(v) => with_three_refs(Nc::FDiv, v),
-            FRem(v) => with_three_refs(Nc::FRem, v),
-            FNeg(v) => with_two_refs(Nc::FNeg, v),
+            UAdd(v) => with_three_stack_refs(Nc::UAdd, v),
+            USub(v) => with_three_stack_refs(Nc::USub, v),
+            UMul(v) => with_three_stack_refs(Nc::UMul, v),
+            UDiv(v) => with_three_stack_refs(Nc::UDiv, v),
+            URem(v) => with_three_stack_refs(Nc::URem, v),
+            IAdd(v) => with_three_stack_refs(Nc::IAdd, v),
+            ISub(v) => with_three_stack_refs(Nc::ISub, v),
+            IMul(v) => with_three_stack_refs(Nc::IMul, v),
+            IDiv(v) => with_three_stack_refs(Nc::IDiv, v),
+            IRem(v) => with_three_stack_refs(Nc::IRem, v),
+            INeg(v) => with_two_stack_refs(Nc::INeg, v),
+            FAdd(v) => with_three_stack_refs(Nc::FAdd, v),
+            FSub(v) => with_three_stack_refs(Nc::FSub, v),
+            FMul(v) => with_three_stack_refs(Nc::FMul, v),
+            FDiv(v) => with_three_stack_refs(Nc::FDiv, v),
+            FRem(v) => with_three_stack_refs(Nc::FRem, v),
+            FNeg(v) => with_two_stack_refs(Nc::FNeg, v),
 
             LdTrue => single(Nc::LdTrue),
             LdFalse => single(Nc::LdFalse),
-            BAnd(v) => with_three_refs(Nc::BAnd, v),
-            BOr(v) => with_three_refs(Nc::BOr, v),
-            BNot(v) => with_two_refs(Nc::BNot, v),
-            BBe(v) => with_two_refs(Nc::BBe, v),
-            BXor(v) => with_three_refs(Nc::BXor, v),
-            LAnd(v) => with_three_refs(Nc::LAnd, v),
-            LOr(v) => with_three_refs(Nc::LOr, v),
-            LNot(v) => with_three_refs(Nc::LNot, v),
-            LXor(v) => with_three_refs(Nc::LXor, v),
-            Shl(v) => with_three_refs(Nc::Shl, v),
-            Shr(v) => with_three_refs(Nc::Shr, v),
-            RotL(v) => with_three_refs(Nc::RotL, v),
-            RotR(v) => with_three_refs(Nc::RotR, v),
+            BAnd(v) => with_three_stack_refs(Nc::BAnd, v),
+            BOr(v) => with_three_stack_refs(Nc::BOr, v),
+            BNot(v) => with_two_stack_refs(Nc::BNot, v),
+            BBe(v) => with_two_stack_refs(Nc::BBe, v),
+            BXor(v) => with_three_stack_refs(Nc::BXor, v),
+            LAnd(v) => with_three_stack_refs(Nc::LAnd, v),
+            LOr(v) => with_three_stack_refs(Nc::LOr, v),
+            LNot(v) => with_three_stack_refs(Nc::LNot, v),
+            LXor(v) => with_three_stack_refs(Nc::LXor, v),
+            Shl(v) => with_three_stack_refs(Nc::Shl, v),
+            Shr(v) => with_three_stack_refs(Nc::Shr, v),
+            RotL(v) => with_three_stack_refs(Nc::RotL, v),
+            RotR(v) => with_three_stack_refs(Nc::RotR, v),
 
-            Ge(v) => with_three_refs(Nc::Ge, v),
-            Gt(v) => with_three_refs(Nc::Gt, v),
-            Le(v) => with_three_refs(Nc::Le, v),
-            Lt(v) => with_three_refs(Nc::Lt, v),
-            Eq(v) => with_three_refs(Nc::Eq, v),
-            Ne(v) => with_three_refs(Nc::Ne, v),
+            Ge(v) => with_three_stack_refs(Nc::Ge, v),
+            Gt(v) => with_three_stack_refs(Nc::Gt, v),
+            Le(v) => with_three_stack_refs(Nc::Le, v),
+            Lt(v) => with_three_stack_refs(Nc::Lt, v),
+            Eq(v) => with_three_stack_refs(Nc::Eq, v),
+            Ne(v) => with_three_stack_refs(Nc::Ne, v),
             J { label } => {
                 let offset = ctx.label_table.get(label);
                 if let Some(offset) = offset {
@@ -250,8 +259,10 @@ impl Opcode {
             }
             StartDeref(r) => with_one_ref(Nc::StartDeref, r.0),
             EndDeref => single(Nc::EndDeref),
-            Mv(r, o) => with_two_refs(Nc::Mv, &TwoStackRefs { result: *r, op: *o }),
+            Mv(r, o) => with_two_stack_refs(Nc::Mv, &TwoStackRefs { result: *r, op: *o }),
             SArrCreate0(len, r) => with_offset_and_ref(Nc::SArrCreate0, *len, r.0),
+            SArrGet { arr_ref, index } => with_two_refs(Nc::SArrRef, arr_ref.0, index.0),
+            SArrMut { arr_mut, index } => with_two_refs(Nc::SArrMut, arr_mut.0, index.0),
         };
         Some(b)
     }
@@ -317,6 +328,8 @@ impl Opcode {
             Mv(_, _) => 1 + refs_size(2),
             SArrCreate0(_, _) => 1 + refs_size(2),
             TraceStackValue(_) => 1 + refs_size(1),
+            SArrGet { .. } => 1 + refs_size(2),
+            SArrMut { .. } => 1 + refs_size(2),
         }
     }
 }
@@ -342,7 +355,15 @@ fn with_one_ref(code: Nc, r: Ref) -> OpcodeBytes {
     res
 }
 
-fn with_two_refs(code: Nc, refs: &TwoStackRefs) -> OpcodeBytes {
+fn with_two_refs(code: Nc, r1: Ref, r2: Ref) -> OpcodeBytes {
+    let mut res = OpcodeBytes::new();
+    res.extend_from_slice(&code.bytes());
+    res.extend_from_slice(&r1.to_le_bytes());
+    res.extend_from_slice(&r2.to_le_bytes());
+    res
+}
+
+fn with_two_stack_refs(code: Nc, refs: &TwoStackRefs) -> OpcodeBytes {
     let mut res = OpcodeBytes::new();
     res.extend_from_slice(&code.bytes());
     res.extend_from_slice(&refs.result.0.to_le_bytes());
@@ -350,7 +371,7 @@ fn with_two_refs(code: Nc, refs: &TwoStackRefs) -> OpcodeBytes {
     res
 }
 
-fn with_three_refs(code: Nc, refs: &ThreeStackRefs) -> OpcodeBytes {
+fn with_three_stack_refs(code: Nc, refs: &ThreeStackRefs) -> OpcodeBytes {
     let mut res = OpcodeBytes::new();
     res.extend(code.bytes());
     res.extend_from_slice(&refs.result.0.to_le_bytes());

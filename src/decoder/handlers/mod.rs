@@ -1,10 +1,10 @@
+use crate::code::refs::{CodeRef, PoolRef};
 use crate::code::{Chunk, RefSource};
 use crate::opcodes::Opcode;
 
 use super::model::{DecoderRef, DecoderRefs};
 use super::tags;
 use super::DecodedOpcode;
-use crate::code::refs::{CodeRef, PoolRef};
 
 pub(super) fn decode_u64_ld0(_: &Chunk) -> Option<DecodedOpcode> {
     Some(DecodedOpcode::zero(Opcode::U64Ld0))

@@ -1,3 +1,5 @@
+use std::mem::size_of;
+
 use crate::code::{refs::refs_size, Chunk};
 use crate::error::VmError;
 use crate::meta::Meta;
@@ -5,7 +7,6 @@ use crate::stack::data::IntoPrimitive;
 use crate::types::checker::{tags, HasTypeCheckerCtx, TypeCheckerCtx};
 use crate::vm::VmRefSource;
 use crate::Vm;
-use std::mem::size_of;
 
 pub(in crate::interpreter) fn handle_j(chunk: &Chunk, vm: &mut Vm) -> Result<usize, VmError> {
     let offset = chunk.read_offset_vm()?;
@@ -19,7 +20,7 @@ pub(in crate::interpreter) fn handle_jc(chunk: &Chunk, vm: &mut Vm) -> Result<us
     let meta = vm.stack_metadata(cond)?;
     let mut t_ctx = TypeCheckerCtx::new();
     let _ = meta
-        .check(tags::COND, &mut t_ctx)
+        .check_with(tags::COND, &mut t_ctx)
         .primitive()
         .bool()
         .and()

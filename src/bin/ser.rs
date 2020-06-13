@@ -1,7 +1,8 @@
-use ngvm::code::refs::*;
-use ngvm::model::{self, Opcode::*};
 use std::fs::File;
 use std::io;
+
+use ngvm::code::refs::*;
+use ngvm::model::{self, Opcode::*};
 
 fn fibonacci() -> Vec<model::Opcode> {
     vec![

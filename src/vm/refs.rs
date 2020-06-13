@@ -1,8 +1,9 @@
+use crate::code::refs::StackRef;
 use crate::vm::ValueLocation;
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
 pub enum LocatedRef {
-    Stack(usize),
+    Stack(StackRef),
     Transient(ValueLocation),
 }
 

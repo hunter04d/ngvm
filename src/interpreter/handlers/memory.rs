@@ -1,6 +1,9 @@
-use crate::code::refs::StackRef;
+use smallvec::{SmallVec, ToSmallVec};
+
 use crate::code::{refs::refs_size, Chunk};
 use crate::error::VmError;
+use crate::stack::data::StackData;
+use crate::stack::get_stack_range;
 use crate::types::RefKind;
 use crate::vm::lock::DerefLock;
 use crate::vm::refs::LocatedRef;
@@ -64,26 +67,32 @@ pub(in crate::interpreter) fn handle_start_deref(
     if matches!(r_kind, RefKind::Mut) {
         meta.lock
             .add_lock(cycle, RefKind::Mut)
-            .map_err(|e| VmError::LockError(e, rf))?;
+            .map_err(|e| VmError::LockError(e, ValueLocation::Stack(rf.0)))?;
     }
     match located_ref {
         LocatedRef::Stack(index) => {
-            let t = vm.stack_metadata(StackRef(index))?.value_type.clone();
-            let v = vm.stack_data(StackRef(index))?.to_vec();
-            vm.push_deref(&v, t, r_kind, rf)
+            let t = vm.stack_metadata(index)?.value_type.clone();
+            let v: SmallVec<[StackData; 2]> = vm.stack_data(index)?.to_smallvec();
+            vm.push_deref(v, t, r_kind, rf);
         }
         LocatedRef::Transient(index) => {
             let meta = vm.transient_refs.get(&index).ok_or(VmError::BadVmState)?;
+            let t = meta.value_type.clone();
             match index {
                 ValueLocation::Stack(index) => {
-                    let v = vm.stack_data(StackRef(index))?.to_vec();
-                    let t = meta.value_type.clone();
-                    vm.push_deref(&v, t, r_kind, rf)
+                    let range = get_stack_range(index, &t);
+                    let v: SmallVec<[StackData; 2]> = vm
+                        .stack
+                        .get(range)
+                        .ok_or(VmError::BadVmState)?
+                        .to_smallvec();
+                    vm.push_deref(v, t, r_kind, rf);
                 }
                 ValueLocation::Heap(_) => unimplemented!(),
             }
         }
-    }
+    };
+
     Ok(1 + refs_size(1))
 }
 
