@@ -5,7 +5,7 @@ pub mod checker;
 mod pointed;
 mod primitive;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Hash)]
 pub enum VmType {
     Primitive(PrimitiveType),
     PointedType(Box<PointedType>),
@@ -61,6 +61,7 @@ impl VmType {
             VmType::PointedType(p) => match p.as_ref() {
                 PointedType::SArr(a) => a.pointer.is_copy(),
                 PointedType::Ref(r) => r.is_copy(),
+                PointedType::Boxed(_) => false,
             },
         }
     }

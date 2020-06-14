@@ -1,10 +1,10 @@
-use crate::code::refs::{CodeRef, PoolRef};
 use crate::code::{Chunk, RefSource};
+use crate::code::refs::{CodeRef, PoolRef};
 use crate::opcodes::Opcode;
 
+use super::DecodedOpcode;
 use super::model::{DecoderRef, DecoderRefs};
 use super::tags;
-use super::DecodedOpcode;
 
 pub(super) fn decode_u64_ld0(_: &Chunk) -> Option<DecodedOpcode> {
     Some(DecodedOpcode::zero(Opcode::U64Ld0))
@@ -125,6 +125,14 @@ generate_two_decode! {
 
     decode_l_not => Opcode::LNot,
     decode_mv => Opcode::Mv,
+}
+
+pub(super) fn decode_mp(chunk: &Chunk) -> Option<DecodedOpcode> {
+    let op = chunk.read_ref_stack(0)?;
+    Some(DecodedOpcode::one(
+        Opcode::Mp,
+        DecoderRef::new(op, tags::OP),
+    ))
 }
 
 pub(super) fn decode_ld_true(_: &Chunk) -> Option<DecodedOpcode> {

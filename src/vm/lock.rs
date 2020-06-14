@@ -65,6 +65,7 @@ impl ValueLock {
         }
     }
 
+    #[deprecated]
     pub fn effective_lock(&self, current_cycle: usize) -> &ValueLock {
         match self.lock_cycle() {
             None => &ValueLock::None,

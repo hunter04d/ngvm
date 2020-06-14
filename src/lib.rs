@@ -7,6 +7,7 @@ use std::collections::HashMap;
 pub use code::Code;
 pub use pool::{Constant, ConstantPool};
 pub use vm::Vm;
+use crate::types::VmType;
 
 pub mod code;
 pub mod decoder;
@@ -25,29 +26,27 @@ pub mod vm;
 pub struct Module {
     /// Blob of constants
     const_pool: ConstantPool,
+    functions: HashMap<String, Function>
 }
 
 impl Module {
     pub fn new(const_pool: ConstantPool) -> Self {
-        Self { const_pool }
+        Self { const_pool, functions: Default::default() }
+    }
+
+    pub fn add_fn(&mut self, s: String, f: Function) -> &mut Self {
+        self.functions.insert(s, f);
+        self
     }
 }
 
-#[allow(dead_code)]
 pub struct Function {
-    signature: Signature,
-    bytecode: Code,
+    pub signature: Signature,
+    pub bytecode: Code,
 }
 
-#[derive(Eq, PartialEq, Hash)]
-#[allow(dead_code)]
+#[derive(PartialEq, Hash)]
 pub struct Signature {
-    name: String,
-    params: (),
-    return_type: (),
-}
-
-#[allow(dead_code)]
-pub struct ObjectDefinition {
-    vtable: HashMap<Signature, Function>,
+    params: Vec<VmType>,
+    return_type: VmType,
 }

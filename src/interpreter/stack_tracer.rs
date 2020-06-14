@@ -71,6 +71,11 @@ impl<'a> Debug for StackTracer<'a> {
                             s.field("location", &r.points_to);
                             s.field("type", &format!("{}", r));
                         }
+                        PointedType::Boxed(t) => {
+                            let ptr = usize::from_single(*data_0.unwrap()) as *const ();
+                            s.field("data", &ptr);
+                            s.field("type", &format!("Box<{:?}>", t));
+                        }
                     }
                 }
             }

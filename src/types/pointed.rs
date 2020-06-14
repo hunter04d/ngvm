@@ -7,10 +7,11 @@ use crate::vm::ValueLocation;
 
 use super::VmType;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Hash)]
 pub enum PointedType {
     SArr(SArrType),
     Ref(RefType),
+    Boxed(VmType),
 }
 
 impl PointedType {
@@ -41,6 +42,7 @@ impl PointedType {
         match self {
             PointedType::SArr(SArrType { len, pointer }) => len * pointer.size(),
             PointedType::Ref(_) => 1,
+            PointedType::Boxed(_) => 1,
         }
     }
 }
@@ -63,14 +65,14 @@ pub enum RefLocation {
     TransientOnHeap,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Hash)]
 pub struct RefType {
     pub kind: RefKind,
     pub points_to: RefLocation,
     pub pointer: VmType,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Hash)]
 pub struct SArrType {
     pub len: usize,
     pub pointer: VmType,
@@ -112,6 +114,7 @@ impl Display for RefType {
                     write!(f, "[{:?};{}]", pointer, len)
                 }
                 PointedType::Ref(r) => write!(f, "({})", r),
+                PointedType::Boxed(t) => write!(f, "Box<{:?}>", t)
             },
         }
     }

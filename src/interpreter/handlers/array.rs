@@ -1,16 +1,16 @@
 //! TODO: refactor
 
-use crate::code::refs::{refs_size, refs_size_with_offset};
 use crate::code::Chunk;
+use crate::code::refs::{refs_size, refs_size_with_offset};
 use crate::error::VmError;
 use crate::meta::{Meta, TransientMeta};
 use crate::stack::data::IntoPrimitive;
-use crate::types::checker::{combine_checks, HasTypeCheckerCtx};
 use crate::types::{HasVmType, RefKind, RefLocation, RefType, VmType};
-use crate::vm::lock::{ValueLock, ValueLockData};
-use crate::vm::refs::LocatedRef;
+use crate::types::checker::{combine_checks, HasTypeCheckerCtx};
 use crate::vm::{ValueLocation, VmRefSource};
 use crate::Vm;
+use crate::vm::lock::{ValueLock, ValueLockData};
+use crate::vm::refs::LocatedRef;
 
 pub(in crate::interpreter) fn handle_s_arr_create_0(
     chunk: &Chunk,
@@ -50,14 +50,12 @@ pub(in crate::interpreter) fn handle_s_arr_get(
     let index_type = index_meta.check("index").primitive().unsigned().get();
     let (ref_type, _) = combine_checks(arr_type, index_type).map_err(VmError::TypeError)?;
 
-
     let ref_data = vm.single_stack_data(arr_ref)?;
     // get the array location
     let arr_loc_ref = ref_type.locate(ref_data);
     // type of an element of an array
     let (arr_location, ptr) = get_arr_data(vm, arr_loc_ref)?;
     let ptr = ptr.clone();
-
 
     vm.stack_metadata_mut(arr_ref)?
         .lock
@@ -110,7 +108,6 @@ pub(in crate::interpreter) fn handle_s_arr_mut(
         .get();
     let index_type = index_meta.check("index").primitive().unsigned().get();
     let (ref_type, _) = combine_checks(arr_type, index_type).map_err(VmError::TypeError)?;
-
 
     let ref_data = vm.single_stack_data(arr_ref)?;
     // get the array location

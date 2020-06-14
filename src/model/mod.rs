@@ -104,6 +104,7 @@ pub enum Opcode {
     StartDeref(StackRef),
     EndDeref,
     Mv(StackRef, StackRef),
+    Mp(StackRef),
     SArrCreate0(usize, PoolRef),
     SArrGet {
         arr_ref: StackRef,
@@ -260,6 +261,7 @@ impl Opcode {
             StartDeref(r) => with_one_ref(Nc::StartDeref, r.0),
             EndDeref => single(Nc::EndDeref),
             Mv(r, o) => with_two_stack_refs(Nc::Mv, &TwoStackRefs { result: *r, op: *o }),
+            Mp(o) => with_one_ref(Nc::Mp, o.0),
             SArrCreate0(len, r) => with_offset_and_ref(Nc::SArrCreate0, *len, r.0),
             SArrGet { arr_ref, index } => with_two_refs(Nc::SArrRef, arr_ref.0, index.0),
             SArrMut { arr_mut, index } => with_two_refs(Nc::SArrMut, arr_mut.0, index.0),
@@ -326,6 +328,7 @@ impl Opcode {
             StartDeref(_) => 1 + refs_size(1),
             EndDeref => 1,
             Mv(_, _) => 1 + refs_size(2),
+            Mp(_) => 1 + refs_size(1),
             SArrCreate0(_, _) => 1 + refs_size(2),
             TraceStackValue(_) => 1 + refs_size(1),
             SArrGet { .. } => 1 + refs_size(2),

@@ -1,8 +1,31 @@
-use crate::types::checker::{Tag, TypeChecker, TypeCheckerCtx};
 use crate::types::{HasVmType, VmType};
+use crate::types::checker::{Tag, TypeChecker, TypeCheckerCtx};
 use crate::vm::lock::{DerefLock, ValueLock};
 use crate::vm::refs::LocatedRef;
 use crate::vm::StackDataRef;
+
+pub enum VmMetaView<'a> {
+    Stack(&'a StackMeta),
+    Transient(&'a TransientMeta),
+}
+
+impl VmMetaView<'_> {
+    pub fn lock(&self) -> &ValueLock {
+        match self {
+            VmMetaView::Stack(s) => s.lock(),
+            VmMetaView::Transient(t) => t.lock(),
+        }
+    }
+}
+
+impl HasVmType for VmMetaView<'_> {
+    fn vm_type(&self) -> &VmType {
+        match *self {
+            VmMetaView::Stack(s) => s.vm_type(),
+            VmMetaView::Transient(t) => t.vm_type(),
+        }
+    }
+}
 
 #[derive(Debug)]
 pub struct StackMeta {

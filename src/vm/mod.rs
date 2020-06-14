@@ -4,14 +4,14 @@ use lock::ValueLock;
 pub use refs::code::VmRefSource;
 use refs::LocatedRef;
 
+use crate::{ConstantPool, Module};
 use crate::code::refs::StackRef;
 use crate::error::VmError;
-use crate::meta::{Meta, StackMeta, TransientMeta};
+use crate::meta::{Meta, StackMeta, TransientMeta, VmMetaView};
 use crate::stack::data::IntoStackData;
 use crate::stack::data::StackData;
 use crate::types::{PointedType, PrimitiveType, RefKind, RefLocation, RefType, VmType};
 use crate::vm::lock::ValueLockData;
-use crate::{ConstantPool, Module};
 
 pub mod lock;
 pub mod refs;
@@ -40,6 +40,8 @@ pub struct Vm {
 
     pub(crate) current_module: String,
 }
+
+pub type Result<T> = std::result::Result<T, VmError>;
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub struct StackDataRef(pub usize);
@@ -84,7 +86,7 @@ impl Vm {
         }
     }
 
-    pub fn single_stack_data(&self, index: StackRef) -> Result<&StackData, VmError> {
+    pub fn single_stack_data(&self, index: StackRef) -> Result<&StackData> {
         let meta = self.stack_metadata(index)?;
         if meta.value_type.size() == 1 {
             self.stack
@@ -95,26 +97,37 @@ impl Vm {
         }
     }
 
-    pub fn stack_data(&self, index: StackRef) -> Result<&[StackData], VmError> {
+    pub fn stack_data(&self, index: StackRef) -> Result<&[StackData]> {
         let meta = self.stack_metadata(index)?;
         let from = meta.index.0;
         let until = from + meta.value_type.size();
         self.stack.get(from..until).ok_or(VmError::BadVmState)
     }
 
-    pub fn stack_metadata(&self, index: StackRef) -> Result<&StackMeta, VmError> {
+    pub fn stack_metadata(&self, index: StackRef) -> Result<&StackMeta> {
         self.stack_metadata
             .get(self.last_stack_frame + index.0)
             .ok_or(VmError::BadVmState)
     }
 
-    pub fn stack_metadata_mut(&mut self, index: StackRef) -> Result<&mut StackMeta, VmError> {
+    pub fn meta_view(&self, l: LocatedRef) -> Result<VmMetaView> {
+        match l {
+            LocatedRef::Stack(sr) => self.stack_metadata(sr).map(VmMetaView::Stack),
+            LocatedRef::Transient(tr) => self
+                .transient_refs
+                .get(&tr)
+                .map(VmMetaView::Transient)
+                .ok_or(VmError::BadVmState),
+        }
+    }
+
+    pub fn stack_metadata_mut(&mut self, index: StackRef) -> Result<&mut StackMeta> {
         self.stack_metadata
             .get_mut(self.last_stack_frame + index.0)
             .ok_or(VmError::BadVmState)
     }
 
-    pub fn single_stack_data_mut(&mut self, index: StackRef) -> Result<&mut StackData, VmError> {
+    pub fn single_stack_data_mut(&mut self, index: StackRef) -> Result<&mut StackData> {
         let meta = self
             .stack_metadata
             .get(self.last_stack_frame + index.0)
@@ -128,7 +141,7 @@ impl Vm {
         }
     }
 
-    pub fn stack_data_mut(&mut self, index: StackRef) -> Result<&mut [StackData], VmError> {
+    pub fn stack_data_mut(&mut self, index: StackRef) -> Result<&mut [StackData]> {
         let meta = self.stack_metadata(index)?;
         let from = meta.index.0;
         let until = from + meta.value_type.size();
@@ -154,11 +167,20 @@ impl Vm {
         self.stack.push(value.into_stack_data());
     }
 
+    pub fn push_typed(&mut self, value: impl IntoIterator<Item = StackData>, t: impl Into<VmType>) {
+        let len = self.stack.len();
+        let cycle = self.current_cycle();
+        let meta = StackMeta::new(t, StackDataRef(len), cycle);
+
+        self.stack_metadata.push(meta);
+        self.stack.extend(value);
+    }
+
     pub fn push_primitive_zeroed(&mut self, t: PrimitiveType) {
         self.push_single_typed(StackData::default(), t)
     }
 
-    pub fn push_stack_ref(&mut self, index: StackRef, kind: RefKind) -> Result<(), VmError> {
+    pub fn push_stack_ref(&mut self, index: StackRef, kind: RefKind) -> Result<()> {
         let cycle = self.current_cycle();
         let meta = self.stack_metadata_mut(index)?;
         let lock = &mut meta.lock;
@@ -177,7 +199,7 @@ impl Vm {
     }
 
     /// Pop the last stack value in its entirety from the stack
-    pub fn pop_stack(&mut self) -> Result<(), VmError> {
+    pub fn pop_stack(&mut self) -> Result<()> {
         if let Some(meta) = self.stack_metadata.pop() {
             let size = meta.value_type.size();
             match meta.value_type {
@@ -192,6 +214,7 @@ impl Vm {
                         let located_ref = r.locate(ref_value);
                         self.unlock_by_ref(located_ref)?;
                     }
+                    PointedType::Boxed(_) => unimplemented!()
                 },
             }
             self.stack.truncate(self.stack.len() - size);
@@ -199,7 +222,7 @@ impl Vm {
         Ok(())
     }
 
-    pub fn free_by_index(&mut self, index: StackRef) -> Result<(), VmError> {
+    pub fn free_by_index(&mut self, index: StackRef) -> Result<()> {
         let meta = self.stack_metadata(index)?;
         let is_copy = meta.value_type.is_copy();
         match &meta.value_type {
@@ -214,6 +237,7 @@ impl Vm {
                     let located_ref = r.locate(ref_value);
                     self.unlock_by_ref(located_ref)?;
                 }
+                PointedType::Boxed(_) => unimplemented!()
             },
         }
         if !is_copy {
@@ -222,7 +246,7 @@ impl Vm {
         Ok(())
     }
 
-    fn unlock_by_ref(&mut self, rf: LocatedRef) -> Result<(), VmError> {
+    fn unlock_by_ref(&mut self, rf: LocatedRef) -> Result<()> {
         let vm_cycle = self.cycle;
         match rf {
             LocatedRef::Stack(index) => {
@@ -250,8 +274,8 @@ impl Vm {
         Ok(())
     }
 
-    pub fn switch_lock_cycle(&mut self, rf: LocatedRef) -> Result<(), VmError> {
-        fn switch_cycle(m: &mut impl Meta, new_cycle: usize) -> Result<(), VmError> {
+    pub fn switch_lock_cycle(&mut self, rf: LocatedRef) -> Result<()> {
+        fn switch_cycle(m: &mut impl Meta, new_cycle: usize) -> Result<()> {
             match m.lock() {
                 ValueLock::Mut(data) if new_cycle >= data.lock_cycle => {
                     *m.lock_mut() = ValueLock::Mut(ValueLockData {
@@ -281,12 +305,12 @@ impl Vm {
         }
     }
 
-    pub fn push_scope(&mut self) -> Result<(), VmError> {
+    pub fn push_scope(&mut self) -> Result<()> {
         self.cycle = self.cycle.checked_add(1).ok_or(VmError::BadVmState)?;
         Ok(())
     }
 
-    pub fn pop_scope(&mut self) -> Result<(), VmError> {
+    pub fn pop_scope(&mut self) -> Result<()> {
         if self.cycle == 1 {
             Err(VmError::BadVmState)
         } else {
@@ -319,7 +343,7 @@ impl Vm {
         });
     }
 
-    pub fn pop_deref(&mut self) -> Result<(), VmError> {
+    pub fn pop_deref(&mut self) -> Result<()> {
         if let Some(d) = self.derefs.pop() {
             let (lr, rt) = self.locate_ref(d.rf)?;
             let pointer_size = rt.pointer.size();
@@ -350,7 +374,7 @@ impl Vm {
         }
     }
 
-    pub fn locate_ref(&self, index: StackRef) -> Result<(LocatedRef, &RefType), VmError> {
+    pub fn locate_ref(&self, index: StackRef) -> Result<(LocatedRef, &RefType)> {
         let meta = self.stack_metadata(index)?;
         if let Some(PointedType::Ref(r)) = meta.value_type.pointed() {
             let data = self.single_stack_data(index)?;

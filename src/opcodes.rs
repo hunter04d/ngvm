@@ -83,6 +83,7 @@ pub enum Opcode {
     TakeMut = 55,
 
     Mv = 60,
+    Mp = 61,
     // TODO: arrays if have time
     /// SArrCreate0 <Size> <Type of array>
     SArrCreate0 = 80,
