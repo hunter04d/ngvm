@@ -68,7 +68,7 @@ pub trait Meta: HasVmType {
         }
     }
 
-    fn check(&self, tag: impl Into<Tag>) -> TypeChecker<TypeCheckerCtx> {
+    fn check(&self, tag: impl Into<Tag>) -> TypeChecker<'_, TypeCheckerCtx> {
         TypeChecker {
             tag: tag.into(),
             vm_type: Some(self.vm_type()),

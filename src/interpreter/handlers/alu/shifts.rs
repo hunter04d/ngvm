@@ -1,5 +1,3 @@
-use std::ops::Try;
-use std::option::NoneError;
 
 use crate::code::{refs::refs_size, Chunk};
 use crate::error::VmError;
@@ -20,14 +18,14 @@ where
     i32: BiOp<M, u32>,
     i16: BiOp<M, u32>,
     i8: BiOp<M, u32>,
-    <u64 as BiOp<M, u32>>::Output: Try<Ok = u64, Error = NoneError>,
-    <u32 as BiOp<M, u32>>::Output: Try<Ok = u32, Error = NoneError>,
-    <u16 as BiOp<M, u32>>::Output: Try<Ok = u16, Error = NoneError>,
-    <u8 as BiOp<M, u32>>::Output: Try<Ok = u8, Error = NoneError>,
-    <i64 as BiOp<M, u32>>::Output: Try<Ok = i64, Error = NoneError>,
-    <i32 as BiOp<M, u32>>::Output: Try<Ok = i32, Error = NoneError>,
-    <i16 as BiOp<M, u32>>::Output: Try<Ok = i16, Error = NoneError>,
-    <i8 as BiOp<M, u32>>::Output: Try<Ok = i8, Error = NoneError>,
+    <u64 as BiOp<M, u32>>::Output: Into<Option<u64>>,
+    <u32 as BiOp<M, u32>>::Output: Into<Option<u32>>,
+    <u16 as BiOp<M, u32>>::Output: Into<Option<u16>>,
+    <u8 as BiOp<M, u32>>::Output: Into<Option<u8>>,
+    <i64 as BiOp<M, u32>>::Output: Into<Option<i64>>,
+    <i32 as BiOp<M, u32>>::Output: Into<Option<i32>>,
+    <i16 as BiOp<M, u32>>::Output: Into<Option<i16>>,
+    <i8 as BiOp<M, u32>>::Output: Into<Option<i8>>,
 {
     let rf = &chunk.read_three_vm()?;
 

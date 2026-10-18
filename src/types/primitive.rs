@@ -3,9 +3,10 @@
 use num_derive::{FromPrimitive, ToPrimitive};
 
 #[repr(u8)]
-#[derive(Eq, PartialEq, Copy, Clone, Hash, ToPrimitive, FromPrimitive, Debug)]
+#[derive(Eq, PartialEq, Copy, Clone, Hash, ToPrimitive, FromPrimitive, Debug, Default)]
 pub enum PrimitiveType {
     /// Never type, infallible
+    #[default]
     Never = 0,
     U64 = 1,
     U32 = 2,
@@ -95,11 +96,6 @@ impl PrimitiveType {
         } else {
             panic!("No size defined for {:?}", self);
         }
-    }
-}
-impl Default for PrimitiveType {
-    fn default() -> Self {
-        PrimitiveType::Never
     }
 }
 

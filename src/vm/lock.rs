@@ -8,31 +8,21 @@ pub struct ValueLockData {
     pub partial_lock: bool,
 }
 
-#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
+#[derive(Debug, Default, Eq, PartialEq, Hash, Copy, Clone)]
 pub enum ValueLock {
+    #[default]
     None,
     Ref(ValueLockData),
     Mut(ValueLockData),
 }
 
-impl Default for ValueLock {
-    fn default() -> Self {
-        ValueLock::None
-    }
-}
-
 #[repr(u8)]
-#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
+#[derive(Debug, Default, Eq, PartialEq, Copy, Clone, Hash)]
 pub enum DerefLock {
+    #[default]
     None,
     Ref,
     Mut,
-}
-
-impl Default for DerefLock {
-    fn default() -> Self {
-        DerefLock::None
-    }
 }
 
 impl From<RefKind> for DerefLock {

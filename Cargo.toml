@@ -2,7 +2,7 @@
 name = "ngvm"
 version = "0.1.0"
 authors = ["hunter04d <hunter04d@gmail.com>"]
-edition = "2018"
+edition = "2024"
 
 default-run = "main"
 [profile.release]
@@ -10,7 +10,7 @@ lto = true
 
 [dependencies]
 num-traits = "0.2"
-num-derive = "0.3"
+num-derive = "0.4"
 thiserror = "1.0"
 smallvec = "1.4"
 arrayvec = "0.5"

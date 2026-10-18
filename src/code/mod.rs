@@ -1,6 +1,5 @@
 use std::convert::{TryFrom, TryInto};
 use std::mem::size_of;
-use std::option::NoneError;
 
 pub use chunk::Chunk;
 use refs::{PoolRef, Ref, StackRef, ThreeStackRefs, TwoStackRefs};
@@ -31,10 +30,10 @@ impl Code {
 }
 
 impl TryFrom<Vec<model::Opcode>> for Code {
-    type Error = NoneError;
+    type Error = ();
 
     fn try_from(opcodes: Vec<model::Opcode>) -> Result<Self, Self::Error> {
-        Self::from_model(&opcodes).ok_or(NoneError)
+        Self::from_model(&opcodes).ok_or(())
     }
 }
 

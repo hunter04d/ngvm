@@ -246,10 +246,10 @@ impl<C: HasTypeCheckerCtx> CombinedPrimitiveTypesChecker<C> {
             .iter()
             .filter_map(|(tag, t)| t.map(|p| (tag, p)))
             .fold(None, |state: Option<(&Tag, PrimitiveType)>, n| {
-                if let Some(i) = state {
-                    if i.1 != n.1 {
-                        errors.push(VmType::Primitive(i.1).tag(i.0.clone()));
-                    }
+                if let Some(i) = state
+                    && i.1 != n.1
+                {
+                    errors.push(VmType::Primitive(i.1).tag(i.0.clone()));
                 }
                 Some(n)
             });
@@ -302,14 +302,14 @@ pub struct ThreePrimitiveTypesChecker<'c> {
 
 impl<'c> ThreePrimitiveTypesChecker<'c> {
     pub fn all_same(mut self) -> AllSamePrimitiveTypeChecker<'c> {
-        if let (Some(result), Some(op1), Some(op2)) = (self.result, self.op1, self.op2) {
-            if result != op1 || result != op2 || op1 != op2 {
-                self.root_ctx().report(TypeError::ThreeNotEqual(
-                    VmType::Primitive(result).tag(tags::RESULT),
-                    VmType::Primitive(op1).tag(tags::OP1),
-                    VmType::Primitive(op2).tag(tags::OP2),
-                ));
-            }
+        if let (Some(result), Some(op1), Some(op2)) = (self.result, self.op1, self.op2)
+            && (result != op1 || result != op2 || op1 != op2)
+        {
+            self.root_ctx().report(TypeError::ThreeNotEqual(
+                VmType::Primitive(result).tag(tags::RESULT),
+                VmType::Primitive(op1).tag(tags::OP1),
+                VmType::Primitive(op2).tag(tags::OP2),
+            ));
         }
         AllSamePrimitiveTypeChecker {
             tag: tags::RESULT_OP1_OP2.into(),
@@ -398,13 +398,13 @@ impl<'c> TwoPrimitiveTypesChecker<'c> {
     }
 
     pub fn all_same(mut self) -> AllSamePrimitiveTypeChecker<'c> {
-        if let (Some(result), Some(op)) = (self.result, self.op) {
-            if result != op {
-                self.root_ctx().report(TypeError::TwoNotEqual(
-                    VmType::Primitive(result).tag(tags::RESULT),
-                    VmType::Primitive(op).tag(tags::OP),
-                ));
-            }
+        if let (Some(result), Some(op)) = (self.result, self.op)
+            && result != op
+        {
+            self.root_ctx().report(TypeError::TwoNotEqual(
+                VmType::Primitive(result).tag(tags::RESULT),
+                VmType::Primitive(op).tag(tags::OP),
+            ));
         }
         AllSamePrimitiveTypeChecker {
             tag: format!("{}, {}", tags::RESULT, tags::OP).into(),
@@ -490,13 +490,13 @@ impl<'c> PrimitiveOperandsTypeChecker<'c> {
     }
 
     pub fn same(mut self) -> TwoPrimitiveMergedTypesChecker<'c> {
-        if let (Some(op1), Some(op2)) = (self.op1, self.op2) {
-            if op1 != op2 {
-                self.root_ctx().report(TypeError::TwoNotEqual(
-                    VmType::Primitive(op1).tag(tags::OP1),
-                    VmType::Primitive(op2).tag(tags::OP2),
-                ));
-            }
+        if let (Some(op1), Some(op2)) = (self.op1, self.op2)
+            && op1 != op2
+        {
+            self.root_ctx().report(TypeError::TwoNotEqual(
+                VmType::Primitive(op1).tag(tags::OP1),
+                VmType::Primitive(op2).tag(tags::OP2),
+            ));
         };
         TwoPrimitiveMergedTypesChecker {
             result: self.ctx.result,
@@ -511,10 +511,10 @@ impl<'c> PrimitiveOperandsTypeChecker<'c> {
         format: impl Fn(&PrimitiveTaggedType) -> String,
     ) -> ThreePrimitiveTypesChecker<'c> {
         self.op1()
-            .cond(|t| cond(t), |t| format(t))
+            .cond(&cond, |t| format(t))
             .and()
             .op2()
-            .cond(|t| cond(t), |t| format(t))
+            .cond(cond, |t| format(t))
             .and()
             .ctx
     }

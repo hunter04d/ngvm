@@ -83,13 +83,13 @@ fn check_ref_move_rules(vm: &Vm, op: StackRef, r: &RefType) -> vm::Result<()> {
         let ref_value = vm.single_stack_data(op)?;
         let located_ref = r.locate(ref_value);
         let value_meta = vm.meta_view(located_ref)?;
-        if let Some(c) = value_meta.lock().lock_cycle() {
-            if c <= cycle {
-                let op_type = VmType::from(r.clone()).tag("o");
-                let msg = "Cannot move a root ref reference. Create a new reference instead";
-                let e = TypeError::Condition(op_type, msg.into());
-                return Err(VmError::TypeError(vec![e]));
-            }
+        if let Some(c) = value_meta.lock().lock_cycle()
+            && c <= cycle
+        {
+            let op_type = VmType::from(r.clone()).tag("o");
+            let msg = "Cannot move a root ref reference. Create a new reference instead";
+            let e = TypeError::Condition(op_type, msg.into());
+            return Err(VmError::TypeError(vec![e]));
         }
     }
     Ok(())

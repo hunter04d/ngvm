@@ -24,7 +24,7 @@ fn run(code: &[model::Opcode], pool: ConstantPool, do_decode: bool) -> Result<()
 
 #[allow(dead_code)]
 fn test_arr() -> (Vec<model::Opcode>, ConstantPool) {
-    let max_size = 50_000 as usize;
+    let max_size = 50_000_usize;
     let mut code = Vec::with_capacity(max_size * 3);
     for i in 0..max_size {
         let l = &[StartScope, SArrCreate0(i, p(0)), EndScope];

@@ -1,7 +1,3 @@
-#![feature(allocator_api)]
-#![feature(alloc_layout_extra)]
-#![feature(try_trait)]
-
 use std::collections::HashMap;
 
 pub use code::Code;

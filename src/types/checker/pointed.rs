@@ -43,12 +43,12 @@ impl<'a, C: HasTypeCheckerCtx> SArrTypeChecker<'a, C> {
         len_cond: impl Fn(usize) -> bool,
         format: impl FnOnce(&SArrType, &Tag) -> String,
     ) -> Self {
-        if let Some(arr) = self.arr_type {
-            if !len_cond(arr.len) {
-                let fmt = format(arr, &self.tag);
-                let vm_type = VmType::from(PointedType::SArr(arr.clone()));
-                self.report(TypeError::Condition(vm_type.tag(self.tag.clone()), fmt))
-            }
+        if let Some(arr) = self.arr_type
+            && !len_cond(arr.len)
+        {
+            let fmt = format(arr, &self.tag);
+            let vm_type = VmType::from(PointedType::SArr(arr.clone()));
+            self.report(TypeError::Condition(vm_type.tag(self.tag.clone()), fmt))
         }
         self
     }

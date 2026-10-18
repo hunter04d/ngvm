@@ -110,7 +110,7 @@ impl Vm {
             .ok_or(VmError::BadVmState)
     }
 
-    pub fn meta_view(&self, l: LocatedRef) -> Result<VmMetaView> {
+    pub fn meta_view(&self, l: LocatedRef) -> Result<VmMetaView<'_>> {
         match l {
             LocatedRef::Stack(sr) => self.stack_metadata(sr).map(VmMetaView::Stack),
             LocatedRef::Transient(tr) => self
@@ -251,10 +251,10 @@ impl Vm {
         match rf {
             LocatedRef::Stack(index) => {
                 let value_meta = self.stack_metadata_mut(index)?;
-                if let Some(c) = value_meta.lock.lock_cycle() {
-                    if c == vm_cycle {
-                        value_meta.lock = ValueLock::None;
-                    }
+                if let Some(c) = value_meta.lock.lock_cycle()
+                    && c == vm_cycle
+                {
+                    value_meta.lock = ValueLock::None;
                 }
             }
             LocatedRef::Transient(index) => {
@@ -262,12 +262,12 @@ impl Vm {
                     .transient_refs
                     .get_mut(&index)
                     .ok_or(VmError::BadVmState)?;
-                if let Some(c) = value_meta.lock.lock_cycle() {
-                    if c == vm_cycle {
-                        value_meta.lock = ValueLock::None;
-                        let root = value_meta.root_object;
-                        self.unlock_by_ref(root)?;
-                    }
+                if let Some(c) = value_meta.lock.lock_cycle()
+                    && c == vm_cycle
+                {
+                    value_meta.lock = ValueLock::None;
+                    let root = value_meta.root_object;
+                    self.unlock_by_ref(root)?;
                 }
             }
         }
@@ -390,7 +390,7 @@ impl Vm {
         let meta = self.new_stack_meta_of_type(arr_type.into());
         self.stack_metadata.push(meta);
         self.stack
-            .extend(std::iter::repeat(StackData::default()).take(stack_size))
+            .extend(std::iter::repeat_n(StackData::default(), stack_size))
     }
 
     pub fn push_s_str(&mut self, ptr: usize, len: usize) {

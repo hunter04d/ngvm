@@ -1,4 +1,4 @@
-use std::alloc::{AllocErr, AllocInit, AllocRef, Layout, LayoutErr, System};
+use std::alloc::{alloc_zeroed, dealloc, Layout, LayoutError};
 use std::fmt::{self, Debug, Formatter};
 use std::marker::PhantomData;
 use std::ops::{Index, IndexMut};
@@ -133,21 +133,21 @@ impl<T> IndexMut<usize> for HeapArray<T> {
 }
 
 #[inline]
-fn allocate_memory<T>(n: usize) -> Result<NonNull<u8>, AllocErr> {
+fn allocate_memory<T>(n: usize) -> Option<NonNull<u8>> {
     let layout = get_layout::<T>(n).unwrap();
-    // we ignore the size allocated as it is guarantied to be at least enough to fit n of Ts
-    Ok(System.alloc(layout, AllocInit::Zeroed)?.ptr)
+    // SAFETY: layout is never zero-sized, it always contains the length
+    NonNull::new(unsafe { alloc_zeroed(layout) })
 }
 
 #[inline]
 fn deallocate_memory<T>(ptr: NonNull<u8>, n: usize) {
     let layout = get_layout::<T>(n).unwrap();
     unsafe {
-        System.dealloc(ptr, layout);
+        dealloc(ptr.as_ptr(), layout);
     }
 }
 
-fn get_layout<T>(n: usize) -> Result<Layout, LayoutErr> {
+fn get_layout<T>(n: usize) -> Result<Layout, LayoutError> {
     let size = Layout::new::<usize>();
     let elements = Layout::array::<T>(n)?;
     Ok(size.extend(elements)?.0)
@@ -177,7 +177,7 @@ mod tests {
             v
         });
         assert_eq!(h_arr.len(), LEN);
-        assert_eq!(h_arr.is_empty(), false);
+        assert!(!h_arr.is_empty());
         for i in 0..LEN {
             assert_eq!(h_arr.get(i), Some(&i));
         }

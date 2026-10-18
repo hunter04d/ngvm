@@ -14,7 +14,7 @@ impl<'a> Debug for StackTracer<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         // TODO: DST tracing
         let stack = self.0;
-        let data_0 = stack.get(0);
+        let data_0 = stack.first();
         let value_type = &self.1.value_type;
         let alt = f.alternate();
         let mut s = f.debug_struct("stack_value");

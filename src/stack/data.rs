@@ -10,10 +10,6 @@ pub(crate) trait FromSingle<T> {
     fn from_single(obj: T) -> Self;
 }
 
-pub(crate) trait FromDouble<T> {
-    fn from_double(obj: T) -> Self;
-}
-
 pub trait FromPrimitive<T> {
     fn from_primitive(obj: T) -> Self;
 }

@@ -12,7 +12,7 @@ mod pointed;
 mod primitive;
 pub mod tags;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct TypeCheckerCtx {
     errors: Vec<TypeError>,
 }
@@ -48,7 +48,7 @@ pub trait HasTypeCheckerCtx: Sized {
             Ok(HasTypeCheckerCtx::unwrap(self))
         } else {
             let errors = &mut self.root_ctx().errors;
-            Err(errors.drain(..).collect())
+            Err(std::mem::take(errors))
         }
     }
     fn get_vm(self) -> Result<Self::Unwrapped, VmError> {
@@ -73,12 +73,6 @@ impl TypeCheckerCtx {
 impl TypeCheckerCtxProvider for TypeCheckerCtx {
     fn type_checker_ctx() -> TypeCheckerCtx {
         Self::new()
-    }
-}
-
-impl Default for TypeCheckerCtx {
-    fn default() -> Self {
-        Self { errors: Vec::new() }
     }
 }
 

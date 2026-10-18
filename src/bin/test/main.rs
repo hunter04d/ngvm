@@ -1,4 +1,3 @@
-use code_samples::*;
 use ngvm::code::refs::{p, s, three};
 use ngvm::error::VmContextError;
 use ngvm::model::Opcode::*;

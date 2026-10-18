@@ -147,14 +147,32 @@ impl Opcode {
     }
 
     pub fn double(value: u8) -> Option<Self> {
-        let value = (value as u16) + u8::MAX as u16;
-        Self::from_u16(value + 256)
+        Self::from_u16(value as u16 + 256)
     }
 
     pub fn from_kind(value: u8, kind: OpcodeKind) -> Option<Self> {
         match kind {
             OpcodeKind::Single => Self::single(value),
             OpcodeKind::Double => Self::double(value),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Every opcode must decode back from the bytes it encodes to
+    #[test]
+    fn test_opcode_roundtrip() {
+        let all_opcodes = (0..=u16::from(u8::MAX) + 256).filter_map(Opcode::from_u16);
+        for op in all_opcodes {
+            let decoded = match op.bytes().as_slice() {
+                &[byte] => Opcode::single(byte),
+                &[u8::MAX, byte] => Opcode::double(byte),
+                bytes => panic!("{:?} encodes to invalid bytes {:?}", op, bytes),
+            };
+            assert_eq!(decoded, Some(op));
         }
     }
 }

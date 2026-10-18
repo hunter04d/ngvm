@@ -1,6 +1,3 @@
-use std::ops::Try;
-use std::option::NoneError;
-
 use crate::code::refs::{ThreeStackRefs, TwoStackRefs};
 use crate::error::VmError;
 use crate::meta::StackMeta;
@@ -23,18 +20,13 @@ fn process_fallible_bi_op<M: BiOpMarker, T, O>(
     refs: &ThreeStackRefs,
 ) -> Result<(), VmError>
 where
-    T: FromSingle<StackData> + BiOp<M, O>,
+    T: FromSingle<StackData> + BiOp<M, O> + IntoStackData + HasPrimitiveType,
     O: FromSingle<StackData>,
-    <T as BiOp<M, O>>::Output: Try<Error = NoneError>,
-    // see: https://github.com/rust-lang/rust/issues/52662
-    <<T as BiOp<M, O>>::Output as Try>::Ok: IntoStackData + HasPrimitiveType,
+    <T as BiOp<M, O>>::Output: Into<Option<T>>,
 {
     let op1 = T::from_single(*vm.single_stack_data(refs.op1)?);
     let op2 = O::from_single(*vm.single_stack_data(refs.op2)?);
-    let r = op1
-        .invoke(op2)
-        .into_result()
-        .map_err(|_| VmError::BiOpError)?;
+    let r = op1.invoke(op2).into().ok_or(VmError::BiOpError)?;
     *vm.single_stack_data_mut(refs.result)? = r.into_stack_data();
     Ok(())
 }
@@ -44,13 +36,11 @@ fn process_fallible_u_op<M: UOpMarker, T>(
     TwoStackRefs { result, op }: &TwoStackRefs,
 ) -> Result<(), VmError>
 where
-    T: FromSingle<StackData> + UOp<M>,
-    <T as UOp<M>>::Output: Try<Error = NoneError>,
-    // see: https://github.com/rust-lang/rust/issues/52662
-    <<T as UOp<M>>::Output as Try>::Ok: IntoStackData + HasPrimitiveType,
+    T: FromSingle<StackData> + UOp<M> + IntoStackData + HasPrimitiveType,
+    <T as UOp<M>>::Output: Into<Option<T>>,
 {
     let op = T::from_single(*vm.single_stack_data(*op)?);
-    let r = op.invoke().into_result().map_err(|_| VmError::UOpError)?;
+    let r = op.invoke().into().ok_or(VmError::UOpError)?;
     *vm.single_stack_data_mut(*result)? = r.into_stack_data();
     Ok(())
 }
@@ -113,20 +103,20 @@ impl<'a> TwoStackMetadata<'a> {
 }
 
 trait AluExtensions {
-    fn three_stack_metadata(&self, refs: &ThreeStackRefs) -> Result<ThreeStackMetadata, VmError>;
+    fn three_stack_metadata(&self, refs: &ThreeStackRefs) -> Result<ThreeStackMetadata<'_>, VmError>;
 
-    fn two_stack_metadata(&self, refs: &TwoStackRefs) -> Result<TwoStackMetadata, VmError>;
+    fn two_stack_metadata(&self, refs: &TwoStackRefs) -> Result<TwoStackMetadata<'_>, VmError>;
 }
 
 impl AluExtensions for Vm {
-    fn three_stack_metadata(&self, refs: &ThreeStackRefs) -> Result<ThreeStackMetadata, VmError> {
+    fn three_stack_metadata(&self, refs: &ThreeStackRefs) -> Result<ThreeStackMetadata<'_>, VmError> {
         let result = self.stack_metadata(refs.result)?;
         let op1 = self.stack_metadata(refs.op1)?;
         let op2 = self.stack_metadata(refs.op2)?;
         Ok(ThreeStackMetadata { result, op1, op2 })
     }
 
-    fn two_stack_metadata(&self, refs: &TwoStackRefs) -> Result<TwoStackMetadata, VmError> {
+    fn two_stack_metadata(&self, refs: &TwoStackRefs) -> Result<TwoStackMetadata<'_>, VmError> {
         let result = self.stack_metadata(refs.result)?;
         let op = self.stack_metadata(refs.op)?;
         Ok(TwoStackMetadata { result, op })

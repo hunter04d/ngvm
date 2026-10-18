@@ -19,7 +19,7 @@ pub(in crate::interpreter) fn handle_jc(chunk: &Chunk, vm: &mut Vm) -> Result<us
     let cond = chunk.read_ref_stack_with_offset_vm(0)?;
     let meta = vm.stack_metadata(cond)?;
     let mut t_ctx = TypeCheckerCtx::new();
-    let _ = meta
+    meta
         .check_with(tags::COND, &mut t_ctx)
         .primitive()
         .bool()

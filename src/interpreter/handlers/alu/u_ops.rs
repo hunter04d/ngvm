@@ -1,5 +1,3 @@
-use std::ops::Try;
-use std::option::NoneError;
 
 use crate::code::{refs::refs_size, Chunk};
 use crate::error::VmError;
@@ -18,10 +16,10 @@ where
     u32: BiOp<M>,
     u16: BiOp<M>,
     u8: BiOp<M>,
-    <u64 as BiOp<M>>::Output: Try<Ok = u64, Error = NoneError>,
-    <u32 as BiOp<M>>::Output: Try<Ok = u32, Error = NoneError>,
-    <u16 as BiOp<M>>::Output: Try<Ok = u16, Error = NoneError>,
-    <u8 as BiOp<M>>::Output: Try<Ok = u8, Error = NoneError>,
+    <u64 as BiOp<M>>::Output: Into<Option<u64>>,
+    <u32 as BiOp<M>>::Output: Into<Option<u32>>,
+    <u16 as BiOp<M>>::Output: Into<Option<u16>>,
+    <u8 as BiOp<M>>::Output: Into<Option<u8>>,
 {
     let rf = &chunk.read_three_vm()?;
 

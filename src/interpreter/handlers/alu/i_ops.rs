@@ -1,5 +1,3 @@
-use std::ops::Try;
-use std::option::NoneError;
 
 use crate::code::{refs::refs_size, Chunk};
 use crate::error::VmError;
@@ -18,10 +16,10 @@ where
     i32: BiOp<M>,
     i16: BiOp<M>,
     i8: BiOp<M>,
-    <i64 as BiOp<M>>::Output: Try<Ok = i64, Error = NoneError>,
-    <i32 as BiOp<M>>::Output: Try<Ok = i32, Error = NoneError>,
-    <i16 as BiOp<M>>::Output: Try<Ok = i16, Error = NoneError>,
-    <i8 as BiOp<M>>::Output: Try<Ok = i8, Error = NoneError>,
+    <i64 as BiOp<M>>::Output: Into<Option<i64>>,
+    <i32 as BiOp<M>>::Output: Into<Option<i32>>,
+    <i16 as BiOp<M>>::Output: Into<Option<i16>>,
+    <i8 as BiOp<M>>::Output: Into<Option<i8>>,
 {
     let rf = &chunk.read_three_vm()?;
 
@@ -48,10 +46,10 @@ where
     i32: UOp<M>,
     i16: UOp<M>,
     i8: UOp<M>,
-    <i64 as UOp<M>>::Output: Try<Ok = i64, Error = NoneError>,
-    <i32 as UOp<M>>::Output: Try<Ok = i32, Error = NoneError>,
-    <i16 as UOp<M>>::Output: Try<Ok = i16, Error = NoneError>,
-    <i8 as UOp<M>>::Output: Try<Ok = i8, Error = NoneError>,
+    <i64 as UOp<M>>::Output: Into<Option<i64>>,
+    <i32 as UOp<M>>::Output: Into<Option<i32>>,
+    <i16 as UOp<M>>::Output: Into<Option<i16>>,
+    <i8 as UOp<M>>::Output: Into<Option<i8>>,
 {
     let rf = &chunk.read_two_vm()?;
     let meta = vm.two_stack_metadata(rf)?;
