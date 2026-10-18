@@ -5,7 +5,7 @@ use crate::error::VmError;
 use crate::meta::Meta;
 use crate::stack::data::IntoPrimitive;
 use crate::types::checker::{tags, HasTypeCheckerCtx, TypeCheckerCtx};
-use crate::vm::VmRefSource;
+use crate::vm::{Access, VmRefSource};
 use crate::Vm;
 
 pub(in crate::interpreter) fn handle_j(chunk: &Chunk, vm: &mut Vm) -> Result<usize, VmError> {
@@ -17,7 +17,7 @@ pub(in crate::interpreter) fn handle_j(chunk: &Chunk, vm: &mut Vm) -> Result<usi
 pub(in crate::interpreter) fn handle_jc(chunk: &Chunk, vm: &mut Vm) -> Result<usize, VmError> {
     let offset = chunk.read_offset_vm()?;
     let cond = chunk.read_ref_stack_with_offset_vm(0)?;
-    let meta = vm.stack_metadata(cond)?;
+    let meta = vm.checked_stack_metadata(cond, Access::Read)?;
     let mut t_ctx = TypeCheckerCtx::new();
     meta
         .check_with(tags::COND, &mut t_ctx)

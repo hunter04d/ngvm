@@ -94,5 +94,5 @@ pub(in crate::interpreter) fn handle_l_not(chunk: &Chunk, vm: &mut Vm) -> Result
         _ => return Err(VmError::InvalidTypeForOperation(VmType::from(t).no_tag())),
     }?;
 
-    Ok(1 + refs_size(3))
+    Ok(1 + refs_size(2))
 }

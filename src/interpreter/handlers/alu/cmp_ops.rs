@@ -82,7 +82,7 @@ where
     let op1 = T::from_single(*vm.single_stack_data(refs.op1)?);
     let op2 = T::from_single(*vm.single_stack_data(refs.op2)?);
     let r = op1.partial_cmp(&op2).ok_or(VmError::BiOpError)?;
-    *vm.single_stack_data_mut(refs.result)? = to_bool(r).into_stack_data();
+    vm.set_single_stack_data(refs.result, to_bool(r).into_stack_data())?;
     Ok(())
 }
 

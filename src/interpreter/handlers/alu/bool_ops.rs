@@ -32,7 +32,7 @@ fn handle_bi_op(
 
     let op1 = *vm.single_stack_data(rf.op1)?;
     let op2 = *vm.single_stack_data(rf.op2)?;
-    *vm.single_stack_data_mut(rf.result)? = processor(op1, op2);
+    vm.set_single_stack_data(rf.result, processor(op1, op2))?;
     Ok(1 + refs_size(3))
 }
 
@@ -57,9 +57,9 @@ fn handle_u_op(
         .and()
         .get_vm()?;
 
-    let op = vm.single_stack_data(rf.op)?;
-    *vm.single_stack_data_mut(rf.result)? = processor(*op);
-    Ok(1 + refs_size(3))
+    let op = *vm.single_stack_data(rf.op)?;
+    vm.set_single_stack_data(rf.result, processor(op))?;
+    Ok(1 + refs_size(2))
 }
 
 fn be(op: StackData) -> bool {

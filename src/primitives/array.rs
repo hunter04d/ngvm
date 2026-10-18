@@ -11,9 +11,11 @@ use std::slice::from_raw_parts;
 ///
 /// # Data layout
 ///
-/// | [0...8)  | [8..8 + Element Size)  | ... | [...8 + length * element size) |
-/// |----------|------------------------|-----|------------------------------|
-/// | Length   | First Element          | ... | Last Element                 |
+/// | [0...8)  | [8..offset)                 | [offset..offset + element size) | ... |
+/// |----------|-----------------------------|---------------------------------|-----|
+/// | Length   | Padding to align of element | First Element                   | ... |
+///
+/// The offset is 8 unless the element is aligned to more than 8 bytes
 ///
 /// # Note
 ///
@@ -41,7 +43,7 @@ impl<T> HeapArray<T> {
             // navigate to the first element
             // SAFETY: this is safe because even if size is 0,
             // base will point *after* allocated memory, which is valid
-            let base = ptr.as_ptr().cast::<usize>().add(1).cast::<T>();
+            let base = data_ptr::<T>(ptr);
             for i in 0..size {
                 // The is nothing at this memory yet, so we *write* to it
                 base.add(i).write(init_fn());
@@ -77,14 +79,7 @@ impl<T> HeapArray<T> {
             None
         } else {
             unsafe {
-                Some(
-                    self.ptr
-                        .as_ptr()
-                        .cast::<usize>()
-                        .add(1)
-                        .cast::<T>()
-                        .add(offset),
-                )
+                Some(data_ptr::<T>(self.ptr).add(offset))
             }
         }
     }
@@ -92,7 +87,7 @@ impl<T> HeapArray<T> {
 
 impl<T> Drop for HeapArray<T> {
     fn drop(&mut self) {
-        let data = unsafe { self.ptr.as_ptr().cast::<usize>().add(1).cast::<T>() };
+        let data = data_ptr::<T>(self.ptr);
         let len = self.len();
         for i in 0..len {
             unsafe { drop_in_place(data.add(i)) }
@@ -105,7 +100,7 @@ impl<T: Debug> Debug for HeapArray<T> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         let len = self.len();
         // safety: safe, even if len == 0 we point 1 byte past allocation which is safe
-        let data = unsafe { self.ptr.as_ptr().cast::<usize>().add(1).cast::<T>() };
+        let data = data_ptr::<T>(self.ptr);
         // safety: safe, either the len is 0 or the data if valid
         let data_slice = unsafe { from_raw_parts(data, len) };
         f.debug_struct("NGHeapArray")
@@ -147,6 +142,17 @@ fn deallocate_memory<T>(ptr: NonNull<u8>, n: usize) {
     }
 }
 
+/// Pointer to the first element of the array allocated at `ptr`
+#[inline]
+fn data_ptr<T>(ptr: NonNull<u8>) -> *mut T {
+    // the elements start at the same offset as in the layout of the allocation
+    let (_, offset) = Layout::new::<usize>()
+        .extend(Layout::new::<T>())
+        .expect("offset of an element always fits");
+    // SAFETY: the offset is within (or one past the end of) the allocation, see `get_layout`
+    unsafe { ptr.as_ptr().add(offset).cast::<T>() }
+}
+
 fn get_layout<T>(n: usize) -> Result<Layout, LayoutError> {
     let size = Layout::new::<usize>();
     let elements = Layout::array::<T>(n)?;
@@ -180,6 +186,24 @@ mod tests {
         assert!(!h_arr.is_empty());
         for i in 0..LEN {
             assert_eq!(h_arr.get(i), Some(&i));
+        }
+    }
+
+    #[test]
+    fn test_over_aligned_elements() {
+        #[repr(align(32))]
+        #[derive(Default, Debug, PartialEq)]
+        struct OverAligned(u64);
+
+        const LEN: usize = 4;
+        let mut h_arr: HeapArray<OverAligned> = HeapArray::with_default(LEN);
+        for i in 0..LEN {
+            let element = h_arr.get_mut(i).unwrap();
+            assert_eq!(element as *mut OverAligned as usize % 32, 0);
+            *element = OverAligned(i as u64);
+        }
+        for i in 0..LEN {
+            assert_eq!(h_arr.get(i), Some(&OverAligned(i as u64)));
         }
     }
 

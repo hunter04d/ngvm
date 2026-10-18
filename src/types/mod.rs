@@ -55,6 +55,18 @@ impl VmType {
         }
     }
 
+    /// Whether a value of this type can hold a borrow of another value
+    pub fn holds_borrow(&self) -> bool {
+        match self {
+            VmType::Primitive(_) => false,
+            VmType::PointedType(p) => match p.as_ref() {
+                PointedType::SArr(a) => a.pointer.holds_borrow(),
+                PointedType::Ref(_) => true,
+                PointedType::Boxed(_) => true,
+            },
+        }
+    }
+
     pub fn is_copy(&self) -> bool {
         match self {
             VmType::Primitive(_) => true,

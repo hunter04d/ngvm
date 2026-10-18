@@ -37,6 +37,14 @@ pub enum VmError {
     LockError(LockError, ValueLocation),
     #[error("Use of moved value @{}", (.0).0)]
     UseOfMovedValue(StackRef),
+    #[error("Index {index} is out of bounds of array of length {len}")]
+    IndexOutOfBounds { index: usize, len: usize },
+    #[error("Attempt to store a reference in @{} which outlives the value it points to", (.0).0)]
+    ReferenceEscapesScope(StackRef),
+    #[error("Attempt to end a scope while a deref started in it is active")]
+    ScopeEndedDuringDeref,
+    #[error("Attempt to deref @{} which points to a value holding references", (.0).0)]
+    DerefOfBorrowingValue(StackRef),
 }
 
 #[derive(Debug)]

@@ -1,7 +1,6 @@
 use crate::types::{HasVmType, VmType};
 use crate::types::checker::{Tag, TypeChecker, TypeCheckerCtx};
 use crate::vm::lock::{DerefLock, ValueLock};
-use crate::vm::refs::LocatedRef;
 use crate::vm::StackDataRef;
 
 pub enum VmMetaView<'a> {
@@ -35,6 +34,9 @@ pub struct StackMeta {
     pub lock: ValueLock,
     pub was_moved: bool,
     pub deref: DerefLock,
+    /// For array element references: absolute index of the array reference
+    /// the element was borrowed through
+    pub borrowed_through: Option<usize>,
     // TODO: other meta fields
 }
 
@@ -47,6 +49,7 @@ impl StackMeta {
             lock: Default::default(),
             was_moved: false,
             deref: Default::default(),
+            borrowed_through: None,
         }
     }
 }
@@ -92,12 +95,12 @@ impl HasVmType for StackMeta {
     }
 }
 
+/// Metadata of a value that is not a stack value of its own (e.g. an array element)
+/// and is currently borrowed
 #[derive(Debug)]
 pub struct TransientMeta {
     pub value_type: VmType,
-    pub root_object: LocatedRef,
     pub lock: ValueLock,
-    pub was_moved: bool,
 }
 
 impl Meta for TransientMeta {

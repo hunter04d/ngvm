@@ -5,7 +5,7 @@ use crate::operations::{BiOp, BiOpMarker, UOp, UOpMarker};
 use crate::stack::data::{FromSingle, IntoStackData, StackData};
 use crate::types::checker::{ThreeTypesChecker, TwoTypesChecker, TypeCheckerCtx};
 use crate::types::HasPrimitiveType;
-use crate::vm::Vm;
+use crate::vm::{Access, Vm};
 
 pub mod bool_ops;
 pub mod cmp_ops;
@@ -27,7 +27,7 @@ where
     let op1 = T::from_single(*vm.single_stack_data(refs.op1)?);
     let op2 = O::from_single(*vm.single_stack_data(refs.op2)?);
     let r = op1.invoke(op2).into().ok_or(VmError::BiOpError)?;
-    *vm.single_stack_data_mut(refs.result)? = r.into_stack_data();
+    vm.set_single_stack_data(refs.result, r.into_stack_data())?;
     Ok(())
 }
 
@@ -41,7 +41,7 @@ where
 {
     let op = T::from_single(*vm.single_stack_data(*op)?);
     let r = op.invoke().into().ok_or(VmError::UOpError)?;
-    *vm.single_stack_data_mut(*result)? = r.into_stack_data();
+    vm.set_single_stack_data(*result, r.into_stack_data())?;
     Ok(())
 }
 
@@ -54,7 +54,7 @@ where
     let op1 = T::from_single(*vm.single_stack_data(refs.op1)?);
     let op2 = T::from_single(*vm.single_stack_data(refs.op2)?);
     let r = op1.invoke(op2);
-    *vm.single_stack_data_mut(refs.result)? = r.into_stack_data();
+    vm.set_single_stack_data(refs.result, r.into_stack_data())?;
     Ok(())
 }
 
@@ -66,7 +66,7 @@ where
 {
     let op = T::from_single(*vm.single_stack_data(refs.op)?);
     let r = op.invoke();
-    *vm.single_stack_data_mut(refs.result)? = r.into_stack_data();
+    vm.set_single_stack_data(refs.result, r.into_stack_data())?;
     Ok(())
 }
 
@@ -110,15 +110,15 @@ trait AluExtensions {
 
 impl AluExtensions for Vm {
     fn three_stack_metadata(&self, refs: &ThreeStackRefs) -> Result<ThreeStackMetadata<'_>, VmError> {
-        let result = self.stack_metadata(refs.result)?;
-        let op1 = self.stack_metadata(refs.op1)?;
-        let op2 = self.stack_metadata(refs.op2)?;
+        let result = self.checked_stack_metadata(refs.result, Access::Write)?;
+        let op1 = self.checked_stack_metadata(refs.op1, Access::Read)?;
+        let op2 = self.checked_stack_metadata(refs.op2, Access::Read)?;
         Ok(ThreeStackMetadata { result, op1, op2 })
     }
 
     fn two_stack_metadata(&self, refs: &TwoStackRefs) -> Result<TwoStackMetadata<'_>, VmError> {
-        let result = self.stack_metadata(refs.result)?;
-        let op = self.stack_metadata(refs.op)?;
+        let result = self.checked_stack_metadata(refs.result, Access::Write)?;
+        let op = self.checked_stack_metadata(refs.op, Access::Read)?;
         Ok(TwoStackMetadata { result, op })
     }
 }

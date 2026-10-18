@@ -1,9 +1,9 @@
-use crate::code::refs::StackRef;
 use crate::vm::ValueLocation;
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
 pub enum LocatedRef {
-    Stack(StackRef),
+    /// Absolute index of a stack value (not relative to the current stack frame)
+    Stack(usize),
     Transient(ValueLocation),
 }
 

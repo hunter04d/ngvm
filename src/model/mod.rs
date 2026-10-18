@@ -68,7 +68,7 @@ pub enum Opcode {
 
     LAnd(ThreeStackRefs),
     LOr(ThreeStackRefs),
-    LNot(ThreeStackRefs),
+    LNot(TwoStackRefs),
     LXor(ThreeStackRefs),
 
     Shl(ThreeStackRefs),
@@ -203,7 +203,7 @@ impl Opcode {
             BXor(v) => with_three_stack_refs(Nc::BXor, v),
             LAnd(v) => with_three_stack_refs(Nc::LAnd, v),
             LOr(v) => with_three_stack_refs(Nc::LOr, v),
-            LNot(v) => with_three_stack_refs(Nc::LNot, v),
+            LNot(v) => with_two_stack_refs(Nc::LNot, v),
             LXor(v) => with_three_stack_refs(Nc::LXor, v),
             Shl(v) => with_three_stack_refs(Nc::Shl, v),
             Shr(v) => with_three_stack_refs(Nc::Shr, v),

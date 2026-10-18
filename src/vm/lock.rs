@@ -2,18 +2,20 @@ use thiserror::Error;
 
 use crate::types::RefKind;
 
-#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
-pub struct ValueLockData {
-    pub lock_cycle: usize,
-    pub partial_lock: bool,
-}
-
+/// Borrow state of a value
+///
+/// Every live reference holds exactly one borrow on the value it points to,
+/// the borrow is released when that reference stops existing.
 #[derive(Debug, Default, Eq, PartialEq, Hash, Copy, Clone)]
 pub enum ValueLock {
     #[default]
     None,
-    Ref(ValueLockData),
-    Mut(ValueLockData),
+    /// Borrowed by this many shared references
+    Ref(usize),
+    /// Borrowed by a single mutable reference, or being mutably dereferenced
+    Mut,
+    /// This array reference was used to borrow this many elements of the array
+    Elements(usize),
 }
 
 #[repr(u8)]
@@ -42,128 +44,80 @@ pub enum LockError {
     MutLockButMutLocked,
     #[error("Attempted to acquire a ref lock on a value, but value is already locked as mut")]
     RefLockButMutLocked,
-    #[error("Attempted to acquire a partial ref lock on a value, but value is already locked as fully as ref")]
-    RefPartialLockButRefFullLock,
+    #[error("Attempted to use a reference while elements borrowed through it are alive")]
+    ElementsBorrowed,
+    #[error("Attempted to borrow elements through a reference that is itself borrowed")]
+    ElementsButLocked,
+    #[error("Attempted to read a value that is mutably borrowed")]
+    ReadButMutLocked,
+    #[error("Attempted to overwrite or move a borrowed value")]
+    WriteButLocked,
+    #[error("Attempted to release a borrow that is not held")]
+    NotLocked,
 }
 
 impl ValueLock {
-    pub fn lock_cycle(&self) -> Option<usize> {
-        match self {
-            ValueLock::None => None,
-            ValueLock::Ref(c) => Some(c.lock_cycle),
-            ValueLock::Mut(c) => Some(c.lock_cycle),
-        }
-    }
-
-    #[deprecated]
-    pub fn effective_lock(&self, current_cycle: usize) -> &ValueLock {
-        match self.lock_cycle() {
-            None => &ValueLock::None,
-            Some(c) if current_cycle < c => &ValueLock::None,
-            Some(_) => self,
-        }
-    }
-
     pub fn is_locked(&self) -> bool {
         !matches!(self, ValueLock::None)
     }
 
-    pub fn can_be_ref_locked(&self) -> bool {
+    /// Checks that the value can be read
+    pub fn check_read(&self) -> Result<(), LockError> {
         match self {
-            ValueLock::None => true,
-            ValueLock::Ref(_) => true,
-            ValueLock::Mut(_) => false,
+            ValueLock::None | ValueLock::Ref(_) => Ok(()),
+            ValueLock::Mut => Err(LockError::ReadButMutLocked),
+            ValueLock::Elements(_) => Err(LockError::ElementsBorrowed),
         }
     }
 
-    pub fn can_be_mut_locked(&self) -> bool {
+    /// Checks that the value can be overwritten or moved out
+    pub fn check_write(&self) -> Result<(), LockError> {
         match self {
-            ValueLock::None => true,
-            ValueLock::Ref(_) => false,
-            ValueLock::Mut(_) => false,
+            ValueLock::None => Ok(()),
+            ValueLock::Elements(_) => Err(LockError::ElementsBorrowed),
+            _ => Err(LockError::WriteButLocked),
         }
     }
 
-    pub fn can_be_locked(&self, ref_kind: RefKind) -> bool {
-        match ref_kind {
-            RefKind::Mut => self.can_be_mut_locked(),
-            RefKind::Ref => self.can_be_ref_locked(),
-        }
+    pub fn add_lock(&mut self, ref_kind: RefKind) -> Result<(), LockError> {
+        *self = match (*self, ref_kind) {
+            (ValueLock::None, RefKind::Ref) => ValueLock::Ref(1),
+            (ValueLock::Ref(n), RefKind::Ref) => ValueLock::Ref(n + 1),
+            (ValueLock::None, RefKind::Mut) => ValueLock::Mut,
+            (ValueLock::Ref(_), RefKind::Mut) => return Err(LockError::MutLockButRefLocked),
+            (ValueLock::Mut, RefKind::Mut) => return Err(LockError::MutLockButMutLocked),
+            (ValueLock::Mut, RefKind::Ref) => return Err(LockError::RefLockButMutLocked),
+            (ValueLock::Elements(_), _) => return Err(LockError::ElementsBorrowed),
+        };
+        Ok(())
     }
 
-    pub fn add_mut_lock(&mut self, current_cycle: usize) -> Result<(), LockError> {
-        match self {
-            ValueLock::None => {
-                *self = ValueLock::Mut(ValueLockData {
-                    lock_cycle: current_cycle,
-                    partial_lock: false,
-                });
-                Ok(())
-            }
-            ValueLock::Ref(_) => Err(LockError::MutLockButRefLocked),
-            ValueLock::Mut(_) => Err(LockError::MutLockButMutLocked),
-        }
+    pub fn release_lock(&mut self, ref_kind: RefKind) -> Result<(), LockError> {
+        *self = match (*self, ref_kind) {
+            (ValueLock::Ref(1), RefKind::Ref) => ValueLock::None,
+            (ValueLock::Ref(n), RefKind::Ref) => ValueLock::Ref(n - 1),
+            (ValueLock::Mut, RefKind::Mut) => ValueLock::None,
+            _ => return Err(LockError::NotLocked),
+        };
+        Ok(())
     }
 
-    pub fn add_ref_lock(&mut self, current_cycle: usize) -> Result<(), LockError> {
-        match self {
-            ValueLock::None => {
-                *self = ValueLock::Ref(ValueLockData {
-                    lock_cycle: current_cycle,
-                    partial_lock: false,
-                });
-                Ok(())
-            }
-            ValueLock::Ref(_) => Ok(()),
-            ValueLock::Mut(_) => Err(LockError::RefLockButMutLocked),
-        }
+    /// Records that an element was borrowed through this (array reference) value
+    pub fn add_element_lock(&mut self) -> Result<(), LockError> {
+        *self = match *self {
+            ValueLock::None => ValueLock::Elements(1),
+            ValueLock::Elements(n) => ValueLock::Elements(n + 1),
+            _ => return Err(LockError::ElementsButLocked),
+        };
+        Ok(())
     }
 
-    pub fn add_lock(&mut self, current_cycle: usize, ref_kind: RefKind) -> Result<(), LockError> {
-        match ref_kind {
-            RefKind::Mut => self.add_mut_lock(current_cycle),
-            RefKind::Ref => self.add_ref_lock(current_cycle),
-        }
-    }
-
-    pub fn add_lock_partial(
-        &mut self,
-        current_cycle: usize,
-        ref_kind: RefKind,
-    ) -> Result<(), LockError> {
-        match ref_kind {
-            RefKind::Mut => self.add_mut_lock_partial(current_cycle),
-            RefKind::Ref => self.add_ref_lock_partial(current_cycle),
-        }
-    }
-
-    pub fn add_mut_lock_partial(&mut self, current_cycle: usize) -> Result<(), LockError> {
-        match self {
-            ValueLock::None => {
-                *self = ValueLock::Mut(ValueLockData {
-                    lock_cycle: current_cycle,
-                    partial_lock: true,
-                });
-                Ok(())
-            }
-            ValueLock::Mut(data) if data.partial_lock => Ok(()),
-            ValueLock::Mut(_) => Err(LockError::MutLockButMutLocked),
-            ValueLock::Ref(_) => Err(LockError::MutLockButRefLocked),
-        }
-    }
-
-    pub fn add_ref_lock_partial(&mut self, current_cycle: usize) -> Result<(), LockError> {
-        match self {
-            ValueLock::None => {
-                *self = ValueLock::Ref(ValueLockData {
-                    lock_cycle: current_cycle,
-                    partial_lock: true,
-                });
-                Ok(())
-            }
-            ValueLock::Ref(data) if data.partial_lock => Ok(()),
-            ValueLock::Ref(_) => Err(LockError::RefPartialLockButRefFullLock),
-            ValueLock::Mut(_) => Err(LockError::RefLockButMutLocked),
-        }
+    pub fn release_element_lock(&mut self) -> Result<(), LockError> {
+        *self = match *self {
+            ValueLock::Elements(1) => ValueLock::None,
+            ValueLock::Elements(n) => ValueLock::Elements(n - 1),
+            _ => return Err(LockError::NotLocked),
+        };
+        Ok(())
     }
 }
