@@ -1,13 +1,13 @@
-use crate::code::{refs::refs_size, Chunk};
+use crate::Vm;
+use crate::code::{Chunk, refs::refs_size};
 use crate::error::VmError;
 use crate::operations::markers::{And, Not, Or, Xor};
 use crate::operations::{BiOp, BiOpMarker};
-use crate::types::checker::{HasTypeCheckerCtx, Taggable, TypeCheckerCtx};
-use crate::types::{PrimitiveType, VmType};
+use crate::types::PrimitiveType;
+use crate::types::checker::{HasTypeCheckerCtx, TypeCheckerCtx};
 use crate::vm::VmRefSource;
-use crate::Vm;
 
-use super::{process_bi_op, process_u_op, AluExtensions};
+use super::{AluExtensions, process_bi_op, process_u_op};
 
 fn handle_l_op<M: BiOpMarker>(chunk: &Chunk, vm: &mut Vm) -> Result<usize, VmError>
 where
@@ -29,7 +29,14 @@ where
         .check(&mut type_checker)
         .all_primitives()
         .all_same()
-        .get_vm()?;
+        .either()
+        .integer()
+        .or()
+        .bool()
+        .and()
+        .fmt(|_, t| format!("<{}>{:?} is neither integer or bool", t.tag, t.vm_type))
+        .get_vm()?
+        .op1;
 
     match t {
         PrimitiveType::U64 => process_bi_op::<M, u64>(vm, rf),
@@ -41,7 +48,7 @@ where
         PrimitiveType::I16 => process_bi_op::<M, i16>(vm, rf),
         PrimitiveType::I8 => process_bi_op::<M, i8>(vm, rf),
         PrimitiveType::Bool => process_bi_op::<M, bool>(vm, rf),
-        _ => Err(VmError::InvalidTypeForOperation(VmType::from(t).no_tag())),
+        _ => unreachable!("{t:?} passed the integer or bool check"),
     }?;
     Ok(1 + refs_size(3))
 }
@@ -91,7 +98,7 @@ pub(in crate::interpreter) fn handle_l_not(chunk: &Chunk, vm: &mut Vm) -> Result
         PrimitiveType::I16 => process_u_op::<Not, i16>(vm, rf),
         PrimitiveType::I8 => process_u_op::<Not, i8>(vm, rf),
         PrimitiveType::Bool => process_u_op::<Not, bool>(vm, rf),
-        _ => return Err(VmError::InvalidTypeForOperation(VmType::from(t).no_tag())),
+        _ => unreachable!("{t:?} passed the integer or bool check"),
     }?;
 
     Ok(1 + refs_size(2))

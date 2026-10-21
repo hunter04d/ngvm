@@ -1,4 +1,4 @@
-//! Tests of the arithmetic ops: one opcode per operation, dispatched by the operand type
+//! Tests of the ALU ops: one opcode per operation, dispatched by the operand type
 
 use crate::code::refs::{PoolRef, StackRef, p, three, two};
 use crate::error::VmError;
@@ -24,6 +24,9 @@ use crate::{Code, Constant, ConstantPool, Vm};
 /// | 12    | 0f64       |
 /// | 13    | 1.5f32     |
 /// | 14    | 3u64       |
+/// | 15    | NaN f64    |
+/// | 16    | 3u8        |
+/// | 17    | 8u8        |
 fn pool() -> ConstantPool {
     ConstantPool::new(vec![
         U8.into(),
@@ -41,6 +44,9 @@ fn pool() -> ConstantPool {
         0f64.into(),
         1.5f32.into(),
         3u64.into(),
+        f64::NAN.into(),
+        3u8.into(),
+        8u8.into(),
     ])
 }
 
@@ -168,3 +174,96 @@ fn test_arith_rejects_mixed_types() {
     assert_type_error(run_err(code));
 }
 
+#[test]
+fn test_logic_ops_on_integers_and_bools() {
+    assert_eq!(run_at::<u8>(bi(U8, 5, 6, LAnd(three(2, 0, 1))), 2), 1);
+    assert_eq!(run_at::<i32>(bi(I32, 7, 8, LOr(three(2, 0, 1))), 2), -5);
+    let code = vec![LdTrue, LdFalse, LdFalse, LXor(three(2, 0, 1))];
+    assert!(run_at::<bool>(code, 2));
+}
+
+#[test]
+fn test_logic_ops_reject_floats() {
+    assert_type_error(run_err(bi(F64, 10, 11, LAnd(three(2, 0, 1)))));
+    assert_type_error(run_err(vec![ld(F64, 10), ld0(F64), LNot(two(1, 0))]));
+}
+
+/// Loads `value` of type `t` at @0, the shift amount `by` of type u8 at @1, a result slot of type
+/// `t` at @2, then runs `op`
+fn shift(t: PrimitiveType, value: usize, by: usize, op: Opcode) -> Vec<Opcode> {
+    vec![ld(t, value), ld(U8, by), ld0(t), op]
+}
+
+#[test]
+fn test_shifts() {
+    assert_eq!(run_at::<u8>(shift(U8, 6, 16, Shl(three(2, 0, 1))), 2), 8);
+    // arithmetic shift for signed integers
+    assert_eq!(run_at::<i32>(shift(I32, 7, 6, Shr(three(2, 0, 1))), 2), -4);
+    assert_eq!(run_at::<u8>(shift(U8, 5, 6, RotL(three(2, 0, 1))), 2), 255);
+}
+
+#[test]
+fn test_shift_by_the_bit_width_fails() {
+    let e = run_err(shift(U8, 6, 17, Shl(three(2, 0, 1))));
+    assert!(matches!(e, VmError::BiOpError), "{:?}", e);
+}
+
+#[test]
+fn test_shift_rejects_non_integer_value() {
+    assert_type_error(run_err(shift(F64, 10, 6, Shl(three(2, 0, 1)))));
+}
+
+#[test]
+fn test_shift_rejects_signed_amount() {
+    let code = vec![ld(I32, 8), ld(I32, 8), ld0(I32), Shl(three(2, 0, 1))];
+    assert_type_error(run_err(code));
+}
+
+/// Loads `op1` and `op2` of type `t` at @0 and @1, a bool result slot set to `init` at @2, then
+/// runs `op`
+fn cmp(t: PrimitiveType, op1: usize, op2: usize, init: bool, op: Opcode) -> Vec<Opcode> {
+    let init = if init { LdTrue } else { LdFalse };
+    vec![ld(t, op1), ld(t, op2), init, op]
+}
+
+#[test]
+fn test_compare_numbers() {
+    assert!(run_at::<bool>(cmp(I32, 7, 8, false, Lt(three(2, 0, 1))), 2));
+    assert!(!run_at::<bool>(cmp(I32, 7, 8, true, Ge(three(2, 0, 1))), 2));
+    assert!(run_at::<bool>(
+        cmp(F64, 10, 10, false, Eq(three(2, 0, 1))),
+        2
+    ));
+    assert!(run_at::<bool>(cmp(U8, 5, 6, false, Gt(three(2, 0, 1))), 2));
+}
+
+#[test]
+fn test_compare_with_nan_follows_ieee() {
+    assert!(!run_at::<bool>(
+        cmp(F64, 15, 15, true, Eq(three(2, 0, 1))),
+        2
+    ));
+    assert!(run_at::<bool>(
+        cmp(F64, 15, 15, false, Ne(three(2, 0, 1))),
+        2
+    ));
+    assert!(!run_at::<bool>(
+        cmp(F64, 15, 10, true, Lt(three(2, 0, 1))),
+        2
+    ));
+    assert!(!run_at::<bool>(
+        cmp(F64, 15, 10, true, Ge(three(2, 0, 1))),
+        2
+    ));
+}
+
+#[test]
+fn test_compare_rejects_non_numbers() {
+    let code = vec![LdTrue, LdTrue, LdFalse, Eq(three(2, 0, 1))];
+    assert_type_error(run_err(code));
+}
+
+#[test]
+fn test_compare_result_must_be_bool() {
+    assert_type_error(run_err(bi(I32, 7, 8, Lt(three(2, 0, 1)))));
+}

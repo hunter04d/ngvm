@@ -1,11 +1,10 @@
-
-use crate::code::{refs::refs_size, Chunk};
+use crate::code::{Chunk, refs::refs_size};
 use crate::error::VmError;
-use crate::interpreter::handlers::alu::{process_fallible_bi_op, AluExtensions};
+use crate::interpreter::handlers::alu::{AluExtensions, process_fallible_bi_op};
 use crate::operations::markers::*;
 use crate::operations::{BiOp, BiOpMarker};
-use crate::types::checker::{HasTypeCheckerCtx, Taggable, TypeCheckerCtx, tags};
-use crate::types::{PrimitiveType, VmType};
+use crate::types::PrimitiveType;
+use crate::types::checker::{HasTypeCheckerCtx, TypeCheckerCtx, tags};
 use crate::vm::{Vm, VmRefSource};
 
 fn handle_shift_op<M: BiOpMarker>(chunk: &Chunk, vm: &mut Vm) -> Result<usize, VmError>
@@ -28,6 +27,8 @@ where
     <i8 as BiOp<M, u32>>::Output: Into<Option<i8>>,
 {
     let rf = &chunk.read_three_vm()?;
+    // the shift amount is read as u32, which is correct for the narrower types only because the
+    // stack stores values zero-extended
 
     let meta = vm.three_stack_metadata(rf)?;
     let mut type_checker = TypeCheckerCtx::new();
@@ -38,6 +39,7 @@ where
         .one_of(&[PrimitiveType::U32, PrimitiveType::U16, PrimitiveType::U8])
         .and()
         .same(&[tags::RESULT, tags::OP1])
+        .integer()
         .and()
         .get_vm()?;
 
@@ -50,9 +52,7 @@ where
         PrimitiveType::I32 => process_fallible_bi_op::<M, i32, u32>(vm, rf),
         PrimitiveType::I16 => process_fallible_bi_op::<M, i16, u32>(vm, rf),
         PrimitiveType::I8 => process_fallible_bi_op::<M, i8, u32>(vm, rf),
-        _ => Err(VmError::InvalidTypeForOperation(
-            VmType::from(types.op1).no_tag(),
-        )),
+        t => unreachable!("{t:?} passed the integer check"),
     }?;
     Ok(1 + refs_size(3))
 }

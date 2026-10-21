@@ -1,19 +1,19 @@
 use std::cmp::Ordering;
 
-use crate::code::refs::{refs_size, ThreeStackRefs};
+use crate::Vm;
 use crate::code::Chunk;
+use crate::code::refs::{ThreeStackRefs, refs_size};
 use crate::error::VmError;
 use crate::interpreter::handlers::alu::AluExtensions;
 use crate::stack::data::{FromSingle, IntoStackData, StackData};
-use crate::types::checker::{HasTypeCheckerCtx, Taggable, TypeCheckerCtx};
-use crate::types::{PrimitiveType, VmType};
+use crate::types::PrimitiveType;
+use crate::types::checker::{HasTypeCheckerCtx, TypeCheckerCtx};
 use crate::vm::VmRefSource;
-use crate::Vm;
 
 fn handle_cmp_op(
     chunk: &Chunk,
     vm: &mut Vm,
-    to_bool: impl Fn(Ordering) -> bool,
+    to_bool: impl Fn(Option<Ordering>) -> bool,
 ) -> Result<usize, VmError> {
     let rf = &chunk.read_three_vm()?;
 
@@ -26,6 +26,7 @@ fn handle_cmp_op(
         .bool()
         .and()
         .same_operands()
+        .number()
         .get_vm()?;
 
     match t {
@@ -39,36 +40,39 @@ fn handle_cmp_op(
         PrimitiveType::I8 => process_cmp_op::<i8, _>(vm, rf, to_bool),
         PrimitiveType::F64 => process_cmp_op::<f64, _>(vm, rf, to_bool),
         PrimitiveType::F32 => process_cmp_op::<f32, _>(vm, rf, to_bool),
-        _ => Err(VmError::InvalidTypeForOperation(VmType::from(t).no_tag())),
+        _ => unreachable!("{t:?} passed the number check"),
     }?;
     Ok(1 + refs_size(3))
 }
 
-fn eq(o: Ordering) -> bool {
-    matches!(o, Ordering::Equal)
+// `None` means the operands are unordered (a NaN is involved): every comparison is false but `ne`,
+// as in IEEE 754
+
+fn eq(o: Option<Ordering>) -> bool {
+    matches!(o, Some(Ordering::Equal))
 }
 
-fn ne(o: Ordering) -> bool {
+fn ne(o: Option<Ordering>) -> bool {
     !eq(o)
 }
 
-fn le(o: Ordering) -> bool {
-    matches!(o, Ordering::Less | Ordering::Equal)
+fn le(o: Option<Ordering>) -> bool {
+    matches!(o, Some(Ordering::Less | Ordering::Equal))
 }
 
-fn ge(o: Ordering) -> bool {
-    matches!(o, Ordering::Greater | Ordering::Equal)
+fn ge(o: Option<Ordering>) -> bool {
+    matches!(o, Some(Ordering::Greater | Ordering::Equal))
 }
 
-fn lt(o: Ordering) -> bool {
-    matches!(o, Ordering::Less)
+fn lt(o: Option<Ordering>) -> bool {
+    matches!(o, Some(Ordering::Less))
 }
 
-fn gt(o: Ordering) -> bool {
-    matches!(o, Ordering::Greater)
+fn gt(o: Option<Ordering>) -> bool {
+    matches!(o, Some(Ordering::Greater))
 }
 
-fn process_cmp_op<T, F: Fn(Ordering) -> bool>(
+fn process_cmp_op<T, F: Fn(Option<Ordering>) -> bool>(
     vm: &mut Vm,
     refs: &ThreeStackRefs,
     to_bool: F,
@@ -78,7 +82,7 @@ where
 {
     let op1 = T::from_single(*vm.single_stack_data(refs.op1)?);
     let op2 = T::from_single(*vm.single_stack_data(refs.op2)?);
-    let r = op1.partial_cmp(&op2).ok_or(VmError::BiOpError)?;
+    let r = op1.partial_cmp(&op2);
     vm.set_single_stack_data(refs.result, to_bool(r).into_stack_data())?;
     Ok(())
 }
