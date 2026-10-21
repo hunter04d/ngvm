@@ -1,6 +1,6 @@
 use handlers::{
-    *, alu::bool_ops::*, alu::cmp_ops::*, alu::f_ops::*, alu::i_ops::*,
-    alu::logic_ops::*, alu::shifts::*, alu::u_ops::*, jumps::*, load::*, memory::*, stack::*,
+    *, alu::arith::*, alu::bool_ops::*, alu::cmp_ops::*, alu::logic_ops::*, alu::shifts::*,
+    jumps::*, load::*, memory::*, stack::*,
 };
 
 use crate::code::Chunk;
@@ -26,23 +26,23 @@ pub(crate) static HANDLERS: [IntHandler; 256] = [
     noop,                     // 7
     handle_ld_ss,             // 8
     noop,                     // 9
-    handle_u_add,             // 10
-    handle_u_sub,             // 11
-    handle_u_mul,             // 12
-    handle_u_div,             // 13
-    handle_u_rem,             // 14
-    handle_i_add,             // 15
-    handle_i_sub,             // 16
-    handle_i_mul,             // 17
-    handle_i_div,             // 18
-    handle_i_rem,             // 19
-    handle_i_neg,             // 20
-    handle_f_add,             // 21
-    handle_f_sub,             // 22
-    handle_f_mul,             // 23
-    handle_f_div,             // 24
-    handle_f_rem,             // 25
-    handle_f_neg,             // 26
+    handle_add,               // 10
+    handle_sub,               // 11
+    handle_mul,               // 12
+    handle_div,               // 13
+    handle_rem,               // 14
+    handle_neg,               // 15
+    noop,                     // 16
+    noop,                     // 17
+    noop,                     // 18
+    noop,                     // 19
+    noop,                     // 20
+    noop,                     // 21
+    noop,                     // 22
+    noop,                     // 23
+    noop,                     // 24
+    noop,                     // 25
+    noop,                     // 26
     handle_b_and,             // 27
     handle_b_or,              // 28
     handle_b_not,             // 29

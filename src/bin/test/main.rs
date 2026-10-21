@@ -46,7 +46,7 @@ fn main() {
         },
         // 5
         StartDeref(s(3)),
-        UAdd(three(5, 5, 4)),
+        Add(three(5, 5, 4)),
         EndDeref,
         EndScope,
         EndScope,

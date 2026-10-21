@@ -13,27 +13,14 @@ pub enum Opcode {
     LdTrue = 5,
     LdFalse = 6,
     LdSS = 8,
-    // u ops
-    UAdd = 10,
-    USub = 11,
-    UMul = 12,
-    UDiv = 13,
-    URem = 14,
-    // i ops
-    IAdd = 15,
-    ISub = 16,
-    IMul = 17,
-    IDiv = 18,
-    IRem = 19,
-    INeg = 20,
-
-    // f ops
-    FAdd = 21,
-    FSub = 22,
-    FMul = 23,
-    FDiv = 24,
-    FRem = 25,
-    FNeg = 26,
+    // arithmetic ops, checked for integers, IEEE for floats
+    Add = 10,
+    Sub = 11,
+    Mul = 12,
+    Div = 13,
+    Rem = 14,
+    /// Neg <Result> <Op>, signed integers and floats only
+    Neg = 15,
 
     // Todo: bool ops
     // the behaviour of those ops are type independent,

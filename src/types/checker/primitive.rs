@@ -82,6 +82,13 @@ impl<C: HasTypeCheckerCtx> PrimitiveTypeChecker<C> {
         )
     }
 
+    pub fn number(self) -> Self {
+        self.cond(
+            |t| t.is_number(),
+            |t| format!("<{}>{:?} is not a number", t.tag, t.t),
+        )
+    }
+
     pub fn unsigned(self) -> Self {
         self.cond(
             |t| t.is_unsigned(),

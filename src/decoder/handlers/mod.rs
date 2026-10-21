@@ -56,24 +56,12 @@ macro_rules! generate_three_decode {
 }
 
 generate_three_decode! {
-    // u ops
-    decode_u_add => Opcode::UAdd,
-    decode_u_sub => Opcode::USub,
-    decode_u_mul => Opcode::UMul,
-    decode_u_div => Opcode::UDiv,
-    decode_u_rem => Opcode::URem,
-    // i ops
-    decode_i_add => Opcode::IAdd,
-    decode_i_sub => Opcode::ISub,
-    decode_i_mul => Opcode::IMul,
-    decode_i_div => Opcode::IDiv,
-    decode_i_rem => Opcode::IRem,
-    // f ops
-    decode_f_add => Opcode::FAdd,
-    decode_f_sub => Opcode::FSub,
-    decode_f_mul => Opcode::FMul,
-    decode_f_div => Opcode::FDiv,
-    decode_f_rem => Opcode::FRem,
+    // arithmetic ops
+    decode_add => Opcode::Add,
+    decode_sub => Opcode::Sub,
+    decode_mul => Opcode::Mul,
+    decode_div => Opcode::Div,
+    decode_rem => Opcode::Rem,
     // bool ops
     decode_b_and => Opcode::BAnd,
     decode_b_or => Opcode::BOr,
@@ -117,8 +105,7 @@ macro_rules! generate_two_decode {
 }
 
 generate_two_decode! {
-    decode_i_neg => Opcode::INeg,
-    decode_f_neg => Opcode::FNeg,
+    decode_neg => Opcode::Neg,
 
     decode_b_not => Opcode::BNot,
     decode_b_be => Opcode::BBe,

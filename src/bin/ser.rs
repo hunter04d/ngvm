@@ -28,10 +28,10 @@ fn fibonacci() -> Vec<model::Opcode> {
         Ld0U64,
         Label(0),
         TraceStackValue(s(2)),
-        UAdd(three(0, 1, 2)),
+        Add(three(0, 1, 2)),
         Mv(s(1), s(2)),
         Mv(s(2), s(0)),
-        UAdd(three(3, 3, 5)),
+        Add(three(3, 3, 5)),
         Le(three(6, 3, 4)),
         JC {
             label: 0,

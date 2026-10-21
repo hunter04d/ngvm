@@ -7,13 +7,14 @@ use crate::types::checker::{OperandTypesChecker, TypeCheckerCtx};
 use crate::types::HasPrimitiveType;
 use crate::vm::{Access, Vm};
 
+pub mod arith;
 pub mod bool_ops;
 pub mod cmp_ops;
-pub mod f_ops;
-pub mod i_ops;
 pub mod logic_ops;
 pub mod shifts;
-pub mod u_ops;
+
+#[cfg(test)]
+mod tests;
 
 fn process_fallible_bi_op<M: BiOpMarker, T, O>(
     vm: &mut Vm,

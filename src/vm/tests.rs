@@ -100,7 +100,7 @@ fn test_deref_writes_through_mut_ref() {
             TakeMut(s(0)),
             ld_u64(1),
             StartDeref(s(1)),
-            UAdd(three(3, 3, 2)),
+            Add(three(3, 3, 2)),
             EndDeref,
         ]),
     ]);
@@ -124,7 +124,7 @@ fn test_write_to_mut_borrowed_value() {
     let e = run_err(vec![
         Ld0U64,
         ld_u64(1),
-        Scope(vec![TakeMut(s(0)), UAdd(three(0, 0, 1))]),
+        Scope(vec![TakeMut(s(0)), Add(three(0, 0, 1))]),
     ]);
     assert_lock_error(e, LockError::WriteButLocked);
 }
@@ -134,7 +134,7 @@ fn test_read_of_mut_borrowed_value() {
     let e = run_err(vec![
         Ld0U64,
         ld_u64(1),
-        Scope(vec![TakeMut(s(0)), UAdd(three(1, 0, 1))]),
+        Scope(vec![TakeMut(s(0)), Add(three(1, 0, 1))]),
     ]);
     assert_lock_error(e, LockError::ReadButMutLocked);
 }
@@ -144,14 +144,14 @@ fn test_shared_borrow_allows_reads_only() {
     let vm = run_ok(vec![
         Ld0U64,
         ld_u64(1),
-        Scope(vec![TakeRef(s(0)), UAdd(three(1, 0, 1))]),
+        Scope(vec![TakeRef(s(0)), Add(three(1, 0, 1))]),
     ]);
     assert_eq!(u64_at(&vm, 1), 1);
 
     let e = run_err(vec![
         Ld0U64,
         ld_u64(1),
-        Scope(vec![TakeRef(s(0)), UAdd(three(0, 0, 1))]),
+        Scope(vec![TakeRef(s(0)), Add(three(0, 0, 1))]),
     ]);
     assert_lock_error(e, LockError::WriteButLocked);
 }
@@ -165,7 +165,7 @@ fn test_shared_borrows_are_counted() {
         Scope(vec![
             TakeRef(s(0)),
             Scope(vec![Mp(s(2))]),
-            UAdd(three(0, 0, 1)),
+            Add(three(0, 0, 1)),
         ]),
     ]);
     assert_lock_error(e, LockError::WriteButLocked);
@@ -174,7 +174,7 @@ fn test_shared_borrows_are_counted() {
         Ld0U64,
         ld_u64(1),
         Scope(vec![TakeRef(s(0)), Scope(vec![Mp(s(2))])]),
-        UAdd(three(0, 0, 1)),
+        Add(three(0, 0, 1)),
     ]);
     assert_eq!(u64_at(&vm, 0), 1);
 }
@@ -207,7 +207,7 @@ fn test_mv_moves_mut_ref() {
             // the moved-to reference is usable
             ld_u64(1),
             StartDeref(s(2)),
-            UAdd(three(4, 4, 3)),
+            Add(three(4, 4, 3)),
             EndDeref,
         ]),
     ]);
@@ -318,7 +318,7 @@ fn test_array_element_write() {
                     index: s(1),
                 },
                 StartDeref(s(3)),
-                UAdd(three(4, 4, 1)),
+                Add(three(4, 4, 1)),
                 EndDeref,
             ]),
             // the element borrow was released with its reference
@@ -362,7 +362,7 @@ fn test_deref_writes_back_to_pointee() {
         Scope(vec![
             TakeMut(s(1)),
             StartDeref(s(3)),
-            UAdd(three(4, 4, 2)),
+            Add(three(4, 4, 2)),
             EndDeref,
         ]),
     ]);
@@ -397,7 +397,7 @@ fn test_ended_deref_is_dead() {
             TakeMut(s(0)),
             StartDeref(s(2)),
             EndDeref,
-            UAdd(three(1, 3, 1)),
+            Add(three(1, 3, 1)),
         ]),
     ]);
     assert!(matches!(e, VmError::UseOfMovedValue(StackRef(3))), "{e:?}");

@@ -19,23 +19,23 @@ pub(crate) static HANDLERS: [fn(&Chunk) -> Option<DecodedOpcode>; 256] = [
     noop,                     // 7
     noop,                     // 8
     noop,                     // 9
-    decode_u_add,             // 10
-    decode_u_sub,             // 11
-    decode_u_mul,             // 12
-    decode_u_div,             // 13
-    decode_u_rem,             // 14
-    decode_i_add,             // 15
-    decode_i_sub,             // 16
-    decode_i_mul,             // 17
-    decode_i_div,             // 18
-    decode_i_rem,             // 19
-    decode_i_neg,             // 20
-    decode_f_add,             // 21
-    decode_f_sub,             // 22
-    decode_f_mul,             // 23
-    decode_f_div,             // 24
-    decode_f_rem,             // 25
-    decode_f_neg,             // 26
+    decode_add,               // 10
+    decode_sub,               // 11
+    decode_mul,               // 12
+    decode_div,               // 13
+    decode_rem,               // 14
+    decode_neg,               // 15
+    noop,                     // 16
+    noop,                     // 17
+    noop,                     // 18
+    noop,                     // 19
+    noop,                     // 20
+    noop,                     // 21
+    noop,                     // 22
+    noop,                     // 23
+    noop,                     // 24
+    noop,                     // 25
+    noop,                     // 26
     decode_b_and,             // 27
     decode_b_or,              // 28
     decode_b_not,             // 29
