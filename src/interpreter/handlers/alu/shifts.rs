@@ -4,7 +4,7 @@ use crate::error::VmError;
 use crate::interpreter::handlers::alu::{process_fallible_bi_op, AluExtensions};
 use crate::operations::markers::*;
 use crate::operations::{BiOp, BiOpMarker};
-use crate::types::checker::{HasTypeCheckerCtx, Taggable, TypeCheckerCtx};
+use crate::types::checker::{HasTypeCheckerCtx, Taggable, TypeCheckerCtx, tags};
 use crate::types::{PrimitiveType, VmType};
 use crate::vm::{Vm, VmRefSource};
 
@@ -37,9 +37,7 @@ where
         .op2()
         .one_of(&[PrimitiveType::U32, PrimitiveType::U16, PrimitiveType::U8])
         .and()
-        .result()
-        .along_with(|c| c.op1())
-        .are_same()
+        .same(&[tags::RESULT, tags::OP1])
         .and()
         .get_vm()?;
 

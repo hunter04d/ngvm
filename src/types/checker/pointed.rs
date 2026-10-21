@@ -1,16 +1,16 @@
 use crate::types::checker::Taggable;
 use crate::types::{PointedType, RefType, SArrType, VmType};
 
-use super::{HasTypeCheckerCtx, Tag, TypeChecker, TypeCheckerCtx, TypeError};
+use super::{Checked, HasTypeCheckerCtx, Tag, TypeChecker, TypeCheckerCtx, TypeError};
 
 pub struct RefTypeChecker<'a, C: HasTypeCheckerCtx> {
-    pub(super) ref_type: Option<&'a RefType>,
+    pub(super) ref_type: Checked<&'a RefType>,
     pub(super) tag: Tag,
     pub(super) ctx: C,
 }
 
 pub struct SArrTypeChecker<'a, C: HasTypeCheckerCtx> {
-    pub(super) arr_type: Option<&'a SArrType>,
+    pub(super) arr_type: Checked<&'a SArrType>,
     pub(super) tag: Tag,
     pub(super) ctx: C,
 }
@@ -43,7 +43,7 @@ impl<'a, C: HasTypeCheckerCtx> SArrTypeChecker<'a, C> {
         len_cond: impl Fn(usize) -> bool,
         format: impl FnOnce(&SArrType, &Tag) -> String,
     ) -> Self {
-        if let Some(arr) = self.arr_type
+        if let Some(arr) = self.arr_type.value()
             && !len_cond(arr.len)
         {
             let fmt = format(arr, &self.tag);

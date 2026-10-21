@@ -64,19 +64,11 @@ pub trait Meta: HasVmType {
         tag: impl Into<Tag>,
         ctx: &'c mut TypeCheckerCtx,
     ) -> TypeChecker<'a, &'c mut TypeCheckerCtx> {
-        TypeChecker {
-            tag: tag.into(),
-            vm_type: Some(self.vm_type()),
-            ctx,
-        }
+        TypeChecker::new(tag, self.vm_type(), ctx)
     }
 
     fn check(&self, tag: impl Into<Tag>) -> TypeChecker<'_, TypeCheckerCtx> {
-        TypeChecker {
-            tag: tag.into(),
-            vm_type: Some(self.vm_type()),
-            ctx: TypeCheckerCtx::new(),
-        }
+        TypeChecker::new(tag, self.vm_type(), TypeCheckerCtx::new())
     }
 }
 

@@ -19,17 +19,16 @@ fn handle_cmp_op(
 
     let meta = vm.three_stack_metadata(rf)?;
     let mut type_checker = TypeCheckerCtx::new();
-    let types = meta
+    let t = meta
         .check(&mut type_checker)
         .all_primitives()
         .result()
         .bool()
         .and()
-        .operands()
-        .same()
+        .same_operands()
         .get_vm()?;
 
-    match types.op {
+    match t {
         PrimitiveType::U64 => process_cmp_op::<u64, _>(vm, rf, to_bool),
         PrimitiveType::U32 => process_cmp_op::<u32, _>(vm, rf, to_bool),
         PrimitiveType::U16 => process_cmp_op::<u16, _>(vm, rf, to_bool),
@@ -40,9 +39,7 @@ fn handle_cmp_op(
         PrimitiveType::I8 => process_cmp_op::<i8, _>(vm, rf, to_bool),
         PrimitiveType::F64 => process_cmp_op::<f64, _>(vm, rf, to_bool),
         PrimitiveType::F32 => process_cmp_op::<f32, _>(vm, rf, to_bool),
-        _ => Err(VmError::InvalidTypeForOperation(
-            VmType::from(types.op).no_tag(),
-        )),
+        _ => Err(VmError::InvalidTypeForOperation(VmType::from(t).no_tag())),
     }?;
     Ok(1 + refs_size(3))
 }

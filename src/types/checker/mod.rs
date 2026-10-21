@@ -1,13 +1,17 @@
-use smallvec::alloc::borrow::Cow;
+use std::borrow::Cow;
+use std::fmt;
 
+use checked::Checked;
+pub use operands::{OperandTypesChecker, PrimitiveOperandsChecker};
 use pointed::{RefTypeChecker, SArrTypeChecker};
 use primitive::PrimitiveTaggedType;
-pub use primitive::ThreePrimitiveTypesChecker;
-use primitive::{PrimitiveTypeChecker, TwoPrimitiveTypesChecker};
+use primitive::PrimitiveTypeChecker;
 
 use crate::error::VmError;
-use crate::types::{PointedType, RefKind, VmType};
+use crate::types::{RefKind, VmType};
 
+mod checked;
+mod operands;
 mod pointed;
 mod primitive;
 pub mod tags;
@@ -100,7 +104,40 @@ impl HasTypeCheckerCtx for &mut TypeCheckerCtx {
     fn unwrap(self) -> Self::Unwrapped {}
 }
 
-pub type Tag = Cow<'static, str>;
+/// Names a checked type in errors
+#[derive(Debug, Clone)]
+pub enum Tag {
+    Name(Cow<'static, str>),
+    /// Operands checked together, named by their tags
+    Group(&'static [&'static str]),
+}
+
+impl fmt::Display for Tag {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Tag::Name(name) => f.write_str(name),
+            Tag::Group(tags) => f.write_str(&tags.join(", ")),
+        }
+    }
+}
+
+impl From<&'static str> for Tag {
+    fn from(name: &'static str) -> Self {
+        Tag::Name(Cow::Borrowed(name))
+    }
+}
+
+impl From<String> for Tag {
+    fn from(name: String) -> Self {
+        Tag::Name(Cow::Owned(name))
+    }
+}
+
+impl From<Cow<'static, str>> for Tag {
+    fn from(name: Cow<'static, str>) -> Self {
+        Tag::Name(name)
+    }
+}
 
 #[derive(Debug)]
 pub struct TaggedType {
@@ -109,26 +146,13 @@ pub struct TaggedType {
 }
 
 pub struct TypeChecker<'a, C: HasTypeCheckerCtx> {
-    pub tag: Tag,
-    pub vm_type: Option<&'a VmType>,
-    pub ctx: C,
-}
-
-pub struct ThreeTypesChecker<'a, 'c> {
-    pub result: &'a VmType,
-    pub op1: &'a VmType,
-    pub op2: &'a VmType,
-    pub ctx: &'c mut TypeCheckerCtx,
-}
-
-pub struct TwoTypesChecker<'a, 'c> {
-    pub result: &'a VmType,
-    pub op: &'a VmType,
-    pub ctx: &'c mut TypeCheckerCtx,
+    tag: Tag,
+    vm_type: Checked<&'a VmType>,
+    ctx: C,
 }
 
 impl TaggedType {
-    pub fn new(tag: impl Into<Cow<'static, str>>, vm_type: &VmType) -> Self {
+    pub fn new(tag: impl Into<Tag>, vm_type: &VmType) -> Self {
         Self {
             tag: tag.into(),
             vm_type: vm_type.clone(),
@@ -159,7 +183,7 @@ pub trait Taggable {
     fn tag(&self, tag: impl Into<Tag>) -> Self::Tagged;
 
     fn no_tag(&self) -> Self::Tagged {
-        self.tag(Cow::Borrowed(""))
+        self.tag("")
     }
 }
 
@@ -181,10 +205,10 @@ pub enum TypeError {
     Condition(TaggedType, String),
     From(Box<TypeError>, String),
     TwoNotEqual(TaggedType, TaggedType),
-    ThreeNotEqual(TaggedType, TaggedType, TaggedType),
     AllNotEqual(Vec<TaggedType>),
     NotReference(TaggedType),
     NotMutReference(TaggedType),
+    NotArray(TaggedType),
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -213,47 +237,44 @@ impl RefCondition {
 }
 
 impl<'a, C: HasTypeCheckerCtx> TypeChecker<'a, C> {
+    pub fn new(tag: impl Into<Tag>, vm_type: &'a VmType, ctx: C) -> Self {
+        Self {
+            tag: tag.into(),
+            vm_type: Checked::known(vm_type),
+            ctx,
+        }
+    }
+
     pub fn primitive(mut self) -> PrimitiveTypeChecker<C> {
-        let p = match self.vm_type {
-            None => None,
-            Some(&VmType::Primitive(p)) => Some(p),
-            Some(t) => {
-                self.ctx
-                    .report(TypeError::NotPrimitive(t.tag(self.tag.clone())));
-                None
+        let t = self.vm_type.and_then(|t| match t.primitive() {
+            Some(p) => Checked::known(p),
+            None => {
+                let err = TypeError::NotPrimitive(t.tag(self.tag.clone()));
+                Checked::poisoned(&mut self.ctx, err)
             }
-        };
+        });
         PrimitiveTypeChecker {
             tag: self.tag,
-            t: p,
+            t,
             ctx: self.ctx,
         }
     }
 
     pub fn of_ref(mut self, cond: RefCondition) -> RefTypeChecker<'a, C> {
-        let r = match self.vm_type {
-            None => None,
-            Some(VmType::PointedType(bpt)) => {
-                if let PointedType::Ref(r) = bpt.as_ref() {
+        let ref_type = self.vm_type.and_then(|t| {
+            let err = || cond.get_error(t.tag(self.tag.clone()));
+            match t.ref_type() {
+                Some(r) => {
                     if !cond.satisfies(r.kind) {
-                        let t = VmType::from(r.clone());
-                        let err = cond.get_error(t.tag(self.tag.clone()));
-                        self.ctx.report(err);
+                        self.ctx.report(err());
                     }
-                    Some(r)
-                } else {
-                    None
+                    Checked::known(r)
                 }
+                None => Checked::poisoned(&mut self.ctx, err()),
             }
-            Some(t) => {
-                let err = cond.get_error(t.tag(self.tag.clone()));
-                self.ctx.report(err);
-                None
-            }
-        };
-        // TODO: poison the type to continue the type check
+        });
         RefTypeChecker {
-            ref_type: r,
+            ref_type,
             tag: self.tag,
             ctx: self.ctx,
         }
@@ -275,23 +296,15 @@ impl<'a, C: HasTypeCheckerCtx> TypeChecker<'a, C> {
     }
 
     pub fn s_arr(mut self) -> SArrTypeChecker<'a, C> {
-        let arr = match self.vm_type {
-            None => None,
-            Some(VmType::PointedType(bpt)) => {
-                if let PointedType::SArr(arr) = bpt.as_ref() {
-                    Some(arr)
-                } else {
-                    None
-                }
+        let arr_type = self.vm_type.and_then(|t| match t.s_arr() {
+            Some(arr) => Checked::known(arr),
+            None => {
+                let err = TypeError::NotArray(t.tag(self.tag.clone()));
+                Checked::poisoned(&mut self.ctx, err)
             }
-            Some(t) => {
-                self.ctx
-                    .report(TypeError::NotPrimitive(t.tag(self.tag.clone())));
-                None
-            }
-        };
+        });
         SArrTypeChecker {
-            arr_type: arr,
+            arr_type,
             tag: self.tag,
             ctx: self.ctx,
         }
@@ -307,57 +320,5 @@ impl<'a, C: HasTypeCheckerCtx> HasTypeCheckerCtx for TypeChecker<'a, C> {
 
     fn unwrap(self) -> Self::Unwrapped {
         self.vm_type.unwrap()
-    }
-}
-
-impl<'a, 'c> ThreeTypesChecker<'a, 'c> {
-    pub fn all_primitives(self) -> ThreePrimitiveTypesChecker<'c> {
-        let result = if let Some(p) = self.result.primitive() {
-            Some(p)
-        } else {
-            self.ctx
-                .report(TypeError::NotPrimitive(self.result.tag(tags::RESULT)));
-            None
-        };
-        let op1 = if let Some(p) = self.op1.primitive() {
-            Some(p)
-        } else {
-            self.ctx
-                .report(TypeError::NotPrimitive(self.op1.tag(tags::OP1)));
-            None
-        };
-        let op2 = if let Some(p) = self.op2.primitive() {
-            Some(p)
-        } else {
-            self.ctx
-                .report(TypeError::NotPrimitive(self.op2.tag(tags::OP1)));
-            None
-        };
-        ThreePrimitiveTypesChecker {
-            result,
-            op1,
-            op2,
-            ctx: self.ctx,
-        }
-    }
-}
-
-impl<'a, 'c> TwoTypesChecker<'a, 'c> {
-    pub fn all_primitives(self) -> TwoPrimitiveTypesChecker<'c> {
-        let result = self.result.primitive();
-        let op = self.op.primitive();
-        if result.is_none() {
-            self.ctx
-                .report(TypeError::NotPrimitive(self.result.tag(tags::RESULT)));
-        }
-        if op.is_none() {
-            self.ctx
-                .report(TypeError::NotPrimitive(self.op.tag(tags::OP)));
-        }
-        TwoPrimitiveTypesChecker {
-            result,
-            op,
-            ctx: self.ctx,
-        }
     }
 }

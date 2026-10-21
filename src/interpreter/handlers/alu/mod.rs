@@ -3,7 +3,7 @@ use crate::error::VmError;
 use crate::meta::StackMeta;
 use crate::operations::{BiOp, BiOpMarker, UOp, UOpMarker};
 use crate::stack::data::{FromSingle, IntoStackData, StackData};
-use crate::types::checker::{ThreeTypesChecker, TwoTypesChecker, TypeCheckerCtx};
+use crate::types::checker::{OperandTypesChecker, TypeCheckerCtx};
 use crate::types::HasPrimitiveType;
 use crate::vm::{Access, Vm};
 
@@ -82,23 +82,19 @@ struct TwoStackMetadata<'a> {
 }
 
 impl<'a> ThreeStackMetadata<'a> {
-    fn check<'c>(&'a self, ctx: &'c mut TypeCheckerCtx) -> ThreeTypesChecker<'a, 'c> {
-        ThreeTypesChecker {
-            result: &self.result.value_type,
-            op1: &self.op1.value_type,
-            op2: &self.op2.value_type,
+    fn check<'c>(&'a self, ctx: &'c mut TypeCheckerCtx) -> OperandTypesChecker<'a, 'c, 3> {
+        OperandTypesChecker::three(
+            &self.result.value_type,
+            &self.op1.value_type,
+            &self.op2.value_type,
             ctx,
-        }
+        )
     }
 }
 
 impl<'a> TwoStackMetadata<'a> {
-    fn check<'c>(&'a self, ctx: &'c mut TypeCheckerCtx) -> TwoTypesChecker<'a, 'c> {
-        TwoTypesChecker {
-            result: &self.result.value_type,
-            op: &self.op.value_type,
-            ctx,
-        }
+    fn check<'c>(&'a self, ctx: &'c mut TypeCheckerCtx) -> OperandTypesChecker<'a, 'c, 2> {
+        OperandTypesChecker::two(&self.result.value_type, &self.op.value_type, ctx)
     }
 }
 

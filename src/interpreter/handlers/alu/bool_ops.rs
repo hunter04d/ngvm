@@ -23,9 +23,7 @@ fn handle_bi_op(
         .result()
         .equals(PrimitiveType::Bool)
         .and()
-        .operands()
-        .same()
-        .and()
+        .same_operands()
         .user()
         .and()
         .get_vm()?;

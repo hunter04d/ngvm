@@ -72,14 +72,14 @@ pub(in crate::interpreter) fn handle_l_not(chunk: &Chunk, vm: &mut Vm) -> Result
         .check(t_ctx)
         .all_primitives()
         .all_same()
-        .and()
         .either()
         .integer()
         .or()
         .bool()
         .and()
         .fmt(|_, t| format!("<{}>{:?} is neither integer or bool", t.tag, t.vm_type))
-        .get_vm()?;
+        .get_vm()?
+        .op;
 
     match t {
         PrimitiveType::U64 => process_u_op::<Not, u64>(vm, rf),
