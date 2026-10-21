@@ -1,29 +1,18 @@
 use crate::Vm;
+use crate::code::refs::ThreeStackRefs;
 use crate::code::{Chunk, refs::refs_size};
 use crate::error::VmError;
-use crate::operations::markers::{And, Not, Or, Xor};
-use crate::operations::{BiOp, BiOpMarker};
 use crate::types::PrimitiveType;
 use crate::types::checker::{HasTypeCheckerCtx, TypeCheckerCtx};
 use crate::vm::VmRefSource;
 
 use super::{AluExtensions, process_bi_op, process_u_op};
 
-fn handle_l_op<M: BiOpMarker>(chunk: &Chunk, vm: &mut Vm) -> Result<usize, VmError>
-where
-    u64: BiOp<M, Output = u64>,
-    u32: BiOp<M, Output = u32>,
-    u16: BiOp<M, Output = u16>,
-    u8: BiOp<M, Output = u8>,
-    i64: BiOp<M, Output = i64>,
-    i32: BiOp<M, Output = i32>,
-    i16: BiOp<M, Output = i16>,
-    i8: BiOp<M, Output = i8>,
-    bool: BiOp<M, Output = bool>,
-{
-    let rf = &chunk.read_three_vm()?;
+/// Reads the operands of a binary logic op and checks they are all the same integer or bool type
+fn bi_logic_operands(chunk: &Chunk, vm: &Vm) -> Result<(ThreeStackRefs, PrimitiveType), VmError> {
+    let rf = chunk.read_three_vm()?;
 
-    let meta = vm.three_stack_metadata(rf)?;
+    let meta = vm.three_stack_metadata(&rf)?;
     let mut type_checker = TypeCheckerCtx::new();
     let t = meta
         .check(&mut type_checker)
@@ -37,36 +26,36 @@ where
         .fmt(|_, t| format!("<{}>{:?} is neither integer or bool", t.tag, t.vm_type))
         .get_vm()?
         .op1;
-
-    match t {
-        PrimitiveType::U64 => process_bi_op::<M, u64>(vm, rf),
-        PrimitiveType::U32 => process_bi_op::<M, u32>(vm, rf),
-        PrimitiveType::U16 => process_bi_op::<M, u16>(vm, rf),
-        PrimitiveType::U8 => process_bi_op::<M, u8>(vm, rf),
-        PrimitiveType::I64 => process_bi_op::<M, i64>(vm, rf),
-        PrimitiveType::I32 => process_bi_op::<M, i32>(vm, rf),
-        PrimitiveType::I16 => process_bi_op::<M, i16>(vm, rf),
-        PrimitiveType::I8 => process_bi_op::<M, i8>(vm, rf),
-        PrimitiveType::Bool => process_bi_op::<M, bool>(vm, rf),
-        _ => unreachable!("{t:?} passed the integer or bool check"),
-    }?;
-    Ok(1 + refs_size(3))
+    Ok((rf, t))
 }
 
 macro_rules! handle_l_ops {
-    ($($fn_name: ident => $marker: ty),* $(,)?) => {
+    ($($fn_name: ident => $op: tt);* $(;)?) => {
         $(
         pub(in crate::interpreter) fn $fn_name(chunk: &Chunk, vm: &mut Vm) -> Result<usize, VmError> {
-            handle_l_op::<$marker>(chunk, vm)
+            let (rf, t) = &bi_logic_operands(chunk, vm)?;
+            match t {
+                PrimitiveType::U64 => process_bi_op(vm, rf, |a: u64, b: u64| a $op b),
+                PrimitiveType::U32 => process_bi_op(vm, rf, |a: u32, b: u32| a $op b),
+                PrimitiveType::U16 => process_bi_op(vm, rf, |a: u16, b: u16| a $op b),
+                PrimitiveType::U8 => process_bi_op(vm, rf, |a: u8, b: u8| a $op b),
+                PrimitiveType::I64 => process_bi_op(vm, rf, |a: i64, b: i64| a $op b),
+                PrimitiveType::I32 => process_bi_op(vm, rf, |a: i32, b: i32| a $op b),
+                PrimitiveType::I16 => process_bi_op(vm, rf, |a: i16, b: i16| a $op b),
+                PrimitiveType::I8 => process_bi_op(vm, rf, |a: i8, b: i8| a $op b),
+                PrimitiveType::Bool => process_bi_op(vm, rf, |a: bool, b: bool| a $op b),
+                _ => unreachable!("{t:?} passed the integer or bool check"),
+            }?;
+            Ok(1 + refs_size(3))
         }
         )*
     };
 }
 
 handle_l_ops! {
-    handle_l_and => And,
-    handle_l_or => Or,
-    handle_l_xor => Xor,
+    handle_l_and => &;
+    handle_l_or => |;
+    handle_l_xor => ^;
 }
 
 pub(in crate::interpreter) fn handle_l_not(chunk: &Chunk, vm: &mut Vm) -> Result<usize, VmError> {
@@ -89,15 +78,15 @@ pub(in crate::interpreter) fn handle_l_not(chunk: &Chunk, vm: &mut Vm) -> Result
         .op;
 
     match t {
-        PrimitiveType::U64 => process_u_op::<Not, u64>(vm, rf),
-        PrimitiveType::U32 => process_u_op::<Not, u32>(vm, rf),
-        PrimitiveType::U16 => process_u_op::<Not, u16>(vm, rf),
-        PrimitiveType::U8 => process_u_op::<Not, u8>(vm, rf),
-        PrimitiveType::I64 => process_u_op::<Not, i64>(vm, rf),
-        PrimitiveType::I32 => process_u_op::<Not, i32>(vm, rf),
-        PrimitiveType::I16 => process_u_op::<Not, i16>(vm, rf),
-        PrimitiveType::I8 => process_u_op::<Not, i8>(vm, rf),
-        PrimitiveType::Bool => process_u_op::<Not, bool>(vm, rf),
+        PrimitiveType::U64 => process_u_op(vm, rf, |a: u64| !a),
+        PrimitiveType::U32 => process_u_op(vm, rf, |a: u32| !a),
+        PrimitiveType::U16 => process_u_op(vm, rf, |a: u16| !a),
+        PrimitiveType::U8 => process_u_op(vm, rf, |a: u8| !a),
+        PrimitiveType::I64 => process_u_op(vm, rf, |a: i64| !a),
+        PrimitiveType::I32 => process_u_op(vm, rf, |a: i32| !a),
+        PrimitiveType::I16 => process_u_op(vm, rf, |a: i16| !a),
+        PrimitiveType::I8 => process_u_op(vm, rf, |a: i8| !a),
+        PrimitiveType::Bool => process_u_op(vm, rf, |a: bool| !a),
         _ => unreachable!("{t:?} passed the integer or bool check"),
     }?;
 

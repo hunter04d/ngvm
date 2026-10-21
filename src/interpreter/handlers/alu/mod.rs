@@ -1,10 +1,8 @@
 use crate::code::refs::{ThreeStackRefs, TwoStackRefs};
 use crate::error::VmError;
 use crate::meta::StackMeta;
-use crate::operations::{BiOp, BiOpMarker, UOp, UOpMarker};
 use crate::stack::data::{FromSingle, IntoStackData, StackData};
 use crate::types::checker::{OperandTypesChecker, TypeCheckerCtx};
-use crate::types::HasPrimitiveType;
 use crate::vm::{Access, Vm};
 
 pub mod arith;
@@ -16,57 +14,64 @@ pub mod shifts;
 #[cfg(test)]
 mod tests;
 
-fn process_fallible_bi_op<M: BiOpMarker, T, O>(
+fn process_bi_op<A, B, R>(
     vm: &mut Vm,
     refs: &ThreeStackRefs,
+    op: impl FnOnce(A, B) -> R,
 ) -> Result<(), VmError>
 where
-    T: FromSingle<StackData> + BiOp<M, O> + IntoStackData + HasPrimitiveType,
-    O: FromSingle<StackData>,
-    <T as BiOp<M, O>>::Output: Into<Option<T>>,
+    A: FromSingle<StackData>,
+    B: FromSingle<StackData>,
+    R: IntoStackData,
 {
-    let op1 = T::from_single(*vm.single_stack_data(refs.op1)?);
-    let op2 = O::from_single(*vm.single_stack_data(refs.op2)?);
-    let r = op1.invoke(op2).into().ok_or(VmError::BiOpError)?;
-    vm.set_single_stack_data(refs.result, r.into_stack_data())?;
+    let op1 = A::from_single(*vm.single_stack_data(refs.op1)?);
+    let op2 = B::from_single(*vm.single_stack_data(refs.op2)?);
+    vm.set_single_stack_data(refs.result, op(op1, op2).into_stack_data())?;
     Ok(())
 }
 
-fn process_fallible_u_op<M: UOpMarker, T>(
+fn process_fallible_bi_op<A, B, R>(
     vm: &mut Vm,
-    TwoStackRefs { result, op }: &TwoStackRefs,
+    refs: &ThreeStackRefs,
+    op: impl FnOnce(A, B) -> Option<R>,
 ) -> Result<(), VmError>
 where
-    T: FromSingle<StackData> + UOp<M> + IntoStackData + HasPrimitiveType,
-    <T as UOp<M>>::Output: Into<Option<T>>,
+    A: FromSingle<StackData>,
+    B: FromSingle<StackData>,
+    R: IntoStackData,
 {
-    let op = T::from_single(*vm.single_stack_data(*op)?);
-    let r = op.invoke().into().ok_or(VmError::UOpError)?;
-    vm.set_single_stack_data(*result, r.into_stack_data())?;
-    Ok(())
-}
-
-fn process_bi_op<M, T>(vm: &mut Vm, refs: &ThreeStackRefs) -> Result<(), VmError>
-where
-    M: BiOpMarker,
-    T: BiOp<M> + FromSingle<StackData>,
-    <T as BiOp<M>>::Output: IntoStackData + HasPrimitiveType,
-{
-    let op1 = T::from_single(*vm.single_stack_data(refs.op1)?);
-    let op2 = T::from_single(*vm.single_stack_data(refs.op2)?);
-    let r = op1.invoke(op2);
+    let op1 = A::from_single(*vm.single_stack_data(refs.op1)?);
+    let op2 = B::from_single(*vm.single_stack_data(refs.op2)?);
+    let r = op(op1, op2).ok_or(VmError::BiOpError)?;
     vm.set_single_stack_data(refs.result, r.into_stack_data())?;
     Ok(())
 }
 
-fn process_u_op<M, T>(vm: &mut Vm, refs: &TwoStackRefs) -> Result<(), VmError>
+fn process_u_op<A, R>(
+    vm: &mut Vm,
+    refs: &TwoStackRefs,
+    op: impl FnOnce(A) -> R,
+) -> Result<(), VmError>
 where
-    M: UOpMarker,
-    T: UOp<M> + FromSingle<StackData>,
-    <T as UOp<M>>::Output: IntoStackData + HasPrimitiveType,
+    A: FromSingle<StackData>,
+    R: IntoStackData,
 {
-    let op = T::from_single(*vm.single_stack_data(refs.op)?);
-    let r = op.invoke();
+    let a = A::from_single(*vm.single_stack_data(refs.op)?);
+    vm.set_single_stack_data(refs.result, op(a).into_stack_data())?;
+    Ok(())
+}
+
+fn process_fallible_u_op<A, R>(
+    vm: &mut Vm,
+    refs: &TwoStackRefs,
+    op: impl FnOnce(A) -> Option<R>,
+) -> Result<(), VmError>
+where
+    A: FromSingle<StackData>,
+    R: IntoStackData,
+{
+    let a = A::from_single(*vm.single_stack_data(refs.op)?);
+    let r = op(a).ok_or(VmError::UOpError)?;
     vm.set_single_stack_data(refs.result, r.into_stack_data())?;
     Ok(())
 }
@@ -100,13 +105,19 @@ impl<'a> TwoStackMetadata<'a> {
 }
 
 trait AluExtensions {
-    fn three_stack_metadata(&self, refs: &ThreeStackRefs) -> Result<ThreeStackMetadata<'_>, VmError>;
+    fn three_stack_metadata(
+        &self,
+        refs: &ThreeStackRefs,
+    ) -> Result<ThreeStackMetadata<'_>, VmError>;
 
     fn two_stack_metadata(&self, refs: &TwoStackRefs) -> Result<TwoStackMetadata<'_>, VmError>;
 }
 
 impl AluExtensions for Vm {
-    fn three_stack_metadata(&self, refs: &ThreeStackRefs) -> Result<ThreeStackMetadata<'_>, VmError> {
+    fn three_stack_metadata(
+        &self,
+        refs: &ThreeStackRefs,
+    ) -> Result<ThreeStackMetadata<'_>, VmError> {
         let result = self.checked_stack_metadata(refs.result, Access::Write)?;
         let op1 = self.checked_stack_metadata(refs.op1, Access::Read)?;
         let op2 = self.checked_stack_metadata(refs.op2, Access::Read)?;

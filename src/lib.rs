@@ -12,7 +12,6 @@ pub mod interpreter;
 pub mod meta;
 pub mod model;
 pub mod opcodes;
-pub mod operations;
 mod pool;
 pub mod primitives;
 mod stack;
