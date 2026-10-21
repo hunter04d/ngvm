@@ -1,7 +1,9 @@
+pub use class::*;
 pub use pointed::*;
 pub use primitive::*;
 
 pub mod checker;
+mod class;
 mod pointed;
 mod primitive;
 
@@ -113,15 +115,17 @@ impl From<SArrType> for VmType {
     }
 }
 
+/// Types of the operands of a 3 operand instruction
 #[derive(Debug, PartialEq)]
-pub struct ThreePrimitiveTypes {
-    pub result: PrimitiveType,
-    pub op1: PrimitiveType,
-    pub op2: PrimitiveType,
+pub struct ThreePrimitiveTypes<R = PrimitiveType, O1 = PrimitiveType, O2 = PrimitiveType> {
+    pub result: R,
+    pub op1: O1,
+    pub op2: O2,
 }
 
+/// Types of the operands of a 2 operand instruction
 #[derive(Debug, PartialEq)]
-pub struct TwoPrimitiveTypes {
-    pub result: PrimitiveType,
-    pub op: PrimitiveType,
+pub struct TwoPrimitiveTypes<R = PrimitiveType, O = PrimitiveType> {
+    pub result: R,
+    pub op: O,
 }

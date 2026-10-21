@@ -1,6 +1,9 @@
-use crate::types::{PrimitiveType, VmType};
+use crate::types::{
+    FloatType, IntegerType, NumberType, PrimitiveClass, PrimitiveType, SignedType, UnsignedType,
+    VmType,
+};
 
-use super::{Checked, HasTypeCheckerCtx, Tag, Taggable, TaggedType, TypeCheckerCtx, TypeError};
+use super::{Checked, HasTypeCheckerCtx, NestedChecker, Tag, Taggable, TypeCheckerCtx, TypeError};
 
 pub struct PrimitiveTaggedType {
     pub tag: Tag,
@@ -11,19 +14,20 @@ fn report_not_user(t: &PrimitiveTaggedType) -> String {
     format!("{} of {:?} is not a user primitive type", t.tag, t.t)
 }
 
-pub struct PrimitiveTypeChecker<C: HasTypeCheckerCtx> {
+/// Checks a primitive type, `T` is the type narrowed by the checks so far
+pub struct PrimitiveTypeChecker<C: HasTypeCheckerCtx, T = PrimitiveType> {
     pub(super) tag: Tag,
-    pub(super) t: Checked<PrimitiveType>,
+    pub(super) t: Checked<T>,
     pub(super) ctx: C,
 }
 
-impl<C: HasTypeCheckerCtx> PrimitiveTypeChecker<C> {
+impl<C: HasTypeCheckerCtx, T: Copy + Into<PrimitiveType>> PrimitiveTypeChecker<C, T> {
     fn report_if(
         mut self,
         cond: impl FnOnce(PrimitiveType) -> bool,
         report: impl FnOnce(PrimitiveTaggedType) -> TypeError,
     ) -> Self {
-        match self.t.value() {
+        match self.t.value().map(Into::into) {
             Some(p) if cond(p) => {
                 let tagged = PrimitiveTaggedType {
                     t: p,
@@ -75,65 +79,59 @@ impl<C: HasTypeCheckerCtx> PrimitiveTypeChecker<C> {
         self.cond(PrimitiveType::is_user, report_not_user)
     }
 
-    pub fn integer(self) -> Self {
-        self.cond(
-            |t| t.is_integer(),
-            |t| format!("<{}>{:?} is not integer", t.tag, t.t),
-        )
-    }
-
-    pub fn number(self) -> Self {
-        self.cond(
-            |t| t.is_number(),
-            |t| format!("<{}>{:?} is not a number", t.tag, t.t),
-        )
-    }
-
-    pub fn unsigned(self) -> Self {
-        self.cond(
-            |t| t.is_unsigned(),
-            |t| format!("<{}>{:?} is not an unsigned integer", t.tag, t.t),
-        )
-    }
-
-    pub fn signed(self) -> Self {
-        self.cond(
-            |t| t.is_signed(),
-            |t| format!("<{}>{:?} is not a signed integer", t.tag, t.t),
-        )
-    }
-
-    pub fn either(self) -> PrimitiveTypeChecker<PrimitiveEitherTypeChecker<C>> {
-        let ctx = self.ctx;
-        let either = PrimitiveEitherTypeChecker {
-            tag: self.tag.clone(),
-            t: self.t,
-            ctx,
-            error: None,
-            passed: false,
-        };
-        PrimitiveTypeChecker {
-            tag: self.tag,
-            t: self.t,
-            ctx: either,
-        }
-    }
-
     pub fn bool(self) -> Self {
         self.equals(PrimitiveType::Bool)
     }
 
-    pub fn float(self) -> Self {
-        self.one_of(&[PrimitiveType::F64, PrimitiveType::F32])
+    /// Checks that the type is a member of the class `K`, narrowing it to `K`
+    pub fn is<K: PrimitiveClass>(self) -> PrimitiveTypeChecker<C, K> {
+        let Self { tag, t, mut ctx } = self;
+        let t = t.and_then(|t| match K::narrow(t.into()) {
+            Some(k) => Checked::known(k),
+            None => {
+                let tagged = VmType::from(t.into()).tag(tag.clone());
+                Checked::poisoned(&mut ctx, TypeError::NotOfClass(tagged, K::NAME))
+            }
+        });
+        PrimitiveTypeChecker { tag, t, ctx }
     }
 
-    pub fn and(self) -> C {
+    pub fn integer(self) -> PrimitiveTypeChecker<C, IntegerType> {
+        self.is()
+    }
+
+    pub fn number(self) -> PrimitiveTypeChecker<C, NumberType> {
+        self.is()
+    }
+
+    pub fn unsigned(self) -> PrimitiveTypeChecker<C, UnsignedType> {
+        self.is()
+    }
+
+    pub fn signed(self) -> PrimitiveTypeChecker<C, SignedType> {
+        self.is()
+    }
+
+    pub fn float(self) -> PrimitiveTypeChecker<C, FloatType> {
+        self.is()
+    }
+}
+
+impl<C: HasTypeCheckerCtx, T> PrimitiveTypeChecker<C, T> {
+    /// Ends the check of this type, continuing with the check it is nested in
+    pub fn parent(self) -> C {
         self.ctx
     }
 }
 
-impl<C: HasTypeCheckerCtx> HasTypeCheckerCtx for PrimitiveTypeChecker<C> {
-    type Unwrapped = PrimitiveType;
+impl<C: HasTypeCheckerCtx, T> NestedChecker<C> for PrimitiveTypeChecker<C, T> {
+    fn into_parent(self) -> C {
+        self.parent()
+    }
+}
+
+impl<C: HasTypeCheckerCtx, T> HasTypeCheckerCtx for PrimitiveTypeChecker<C, T> {
+    type Unwrapped = T;
 
     fn root_ctx(&mut self) -> &mut TypeCheckerCtx {
         self.ctx.root_ctx()
@@ -141,61 +139,5 @@ impl<C: HasTypeCheckerCtx> HasTypeCheckerCtx for PrimitiveTypeChecker<C> {
 
     fn unwrap(self) -> Self::Unwrapped {
         self.t.unwrap()
-    }
-}
-
-impl<C: HasTypeCheckerCtx> PrimitiveTypeChecker<PrimitiveEitherTypeChecker<C>> {
-    /// Starts the next alternative: if the previous one failed, its error is discarded, otherwise
-    /// the errors of the remaining alternatives are ignored
-    pub fn or(mut self) -> PrimitiveTypeChecker<PrimitiveEitherTypeChecker<C>> {
-        if self.ctx.error.take().is_none() {
-            self.ctx.passed = true;
-        }
-        self
-    }
-}
-
-pub struct PrimitiveEitherTypeChecker<C: HasTypeCheckerCtx> {
-    tag: Tag,
-    t: Checked<PrimitiveType>,
-    ctx: C,
-    error: Option<TypeError>,
-    /// One of the alternatives has already passed
-    passed: bool,
-}
-
-impl<C: HasTypeCheckerCtx> PrimitiveEitherTypeChecker<C> {
-    pub fn and(mut self) -> C {
-        if let Some(e) = self.error {
-            self.ctx.root_ctx().report(e)
-        }
-        self.ctx
-    }
-
-    pub fn fmt(mut self, format: impl FnOnce(&TypeError, &TaggedType) -> String) -> C {
-        if let (Some(e), Some(t)) = (self.error, self.t.value()) {
-            let tagged = VmType::from(t).tag(self.tag);
-            let format = format(&e, &tagged);
-            self.ctx
-                .root_ctx()
-                .report(TypeError::From(Box::new(e), format));
-        }
-        self.ctx
-    }
-}
-
-impl<C: HasTypeCheckerCtx> HasTypeCheckerCtx for PrimitiveEitherTypeChecker<C> {
-    type Unwrapped = ();
-
-    fn root_ctx(&mut self) -> &mut TypeCheckerCtx {
-        self.ctx.root_ctx()
-    }
-
-    fn unwrap(self) -> Self::Unwrapped {}
-
-    fn report(&mut self, e: TypeError) {
-        if !self.passed {
-            self.error = Some(e);
-        }
     }
 }

@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::fmt;
 
 use checked::Checked;
-pub use operands::{OperandTypesChecker, PrimitiveOperandsChecker};
+pub use operands::{ThreeOperandsChecker, TwoOperandsChecker};
 use pointed::{RefTypeChecker, SArrTypeChecker};
 use primitive::PrimitiveTaggedType;
 use primitive::PrimitiveTypeChecker;
@@ -61,6 +61,18 @@ pub trait HasTypeCheckerCtx: Sized {
 
     fn report(&mut self, e: TypeError) {
         self.root_ctx().report(e);
+    }
+}
+
+/// A check nested in another one, the parent check continues once the nested check is done
+pub trait NestedChecker<P> {
+    fn into_parent(self) -> P;
+}
+
+/// A nested check closure can also return the parent itself, after going back to it with `parent()`
+impl<P: HasTypeCheckerCtx> NestedChecker<P> for P {
+    fn into_parent(self) -> P {
+        self
     }
 }
 
@@ -203,7 +215,8 @@ pub enum TypeError {
     NotEquals(TaggedType, VmType),
     NotOneOf(TaggedType, Vec<VmType>),
     Condition(TaggedType, String),
-    From(Box<TypeError>, String),
+    /// The type is not a member of the named class
+    NotOfClass(TaggedType, &'static str),
     TwoNotEqual(TaggedType, TaggedType),
     AllNotEqual(Vec<TaggedType>),
     NotReference(TaggedType),
@@ -308,6 +321,17 @@ impl<'a, C: HasTypeCheckerCtx> TypeChecker<'a, C> {
             tag: self.tag,
             ctx: self.ctx,
         }
+    }
+
+    /// Ends the check of this type, continuing with the check it is nested in
+    pub fn parent(self) -> C {
+        self.ctx
+    }
+}
+
+impl<C: HasTypeCheckerCtx> NestedChecker<C> for TypeChecker<'_, C> {
+    fn into_parent(self) -> C {
+        self.parent()
     }
 }
 

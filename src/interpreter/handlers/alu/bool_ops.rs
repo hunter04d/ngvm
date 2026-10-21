@@ -19,13 +19,9 @@ fn handle_bi_op(
     let mut t_ctx = TypeCheckerCtx::new();
     let _ = meta
         .check(&mut t_ctx)
-        .all_primitives()
-        .result()
-        .equals(PrimitiveType::Bool)
-        .and()
         .same_operands()
-        .user()
-        .and()
+        .result(|t| t.equals(PrimitiveType::Bool))
+        .op(|t| t.user())
         .get_vm()?;
 
     let op1 = *vm.single_stack_data(rf.op1)?;
@@ -46,13 +42,8 @@ fn handle_u_op(
     let t_ctx = &mut TypeCheckerCtx::new();
     let _ = meta
         .check(t_ctx)
-        .all_primitives()
-        .result()
-        .bool()
-        .and()
-        .op()
-        .user()
-        .and()
+        .result(|t| t.bool())
+        .op(|t| t.user())
         .get_vm()?;
 
     let op = *vm.single_stack_data(rf.op)?;

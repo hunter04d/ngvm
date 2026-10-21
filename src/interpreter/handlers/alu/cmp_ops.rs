@@ -6,7 +6,7 @@ use crate::code::refs::{ThreeStackRefs, refs_size};
 use crate::error::VmError;
 use crate::interpreter::handlers::alu::AluExtensions;
 use crate::stack::data::{FromSingle, IntoStackData, StackData};
-use crate::types::PrimitiveType;
+use crate::types::NumberType;
 use crate::types::checker::{HasTypeCheckerCtx, TypeCheckerCtx};
 use crate::vm::VmRefSource;
 
@@ -21,26 +21,23 @@ fn handle_cmp_op(
     let mut type_checker = TypeCheckerCtx::new();
     let t = meta
         .check(&mut type_checker)
-        .all_primitives()
-        .result()
-        .bool()
-        .and()
         .same_operands()
-        .number()
-        .get_vm()?;
+        .result(|t| t.bool())
+        .op(|t| t.number())
+        .get_vm()?
+        .op;
 
     match t {
-        PrimitiveType::U64 => process_cmp_op::<u64, _>(vm, rf, to_bool),
-        PrimitiveType::U32 => process_cmp_op::<u32, _>(vm, rf, to_bool),
-        PrimitiveType::U16 => process_cmp_op::<u16, _>(vm, rf, to_bool),
-        PrimitiveType::U8 => process_cmp_op::<u8, _>(vm, rf, to_bool),
-        PrimitiveType::I64 => process_cmp_op::<i64, _>(vm, rf, to_bool),
-        PrimitiveType::I32 => process_cmp_op::<i32, _>(vm, rf, to_bool),
-        PrimitiveType::I16 => process_cmp_op::<i16, _>(vm, rf, to_bool),
-        PrimitiveType::I8 => process_cmp_op::<i8, _>(vm, rf, to_bool),
-        PrimitiveType::F64 => process_cmp_op::<f64, _>(vm, rf, to_bool),
-        PrimitiveType::F32 => process_cmp_op::<f32, _>(vm, rf, to_bool),
-        _ => unreachable!("{t:?} passed the number check"),
+        NumberType::U64 => process_cmp_op::<u64, _>(vm, rf, to_bool),
+        NumberType::U32 => process_cmp_op::<u32, _>(vm, rf, to_bool),
+        NumberType::U16 => process_cmp_op::<u16, _>(vm, rf, to_bool),
+        NumberType::U8 => process_cmp_op::<u8, _>(vm, rf, to_bool),
+        NumberType::I64 => process_cmp_op::<i64, _>(vm, rf, to_bool),
+        NumberType::I32 => process_cmp_op::<i32, _>(vm, rf, to_bool),
+        NumberType::I16 => process_cmp_op::<i16, _>(vm, rf, to_bool),
+        NumberType::I8 => process_cmp_op::<i8, _>(vm, rf, to_bool),
+        NumberType::F64 => process_cmp_op::<f64, _>(vm, rf, to_bool),
+        NumberType::F32 => process_cmp_op::<f32, _>(vm, rf, to_bool),
     }?;
     Ok(1 + refs_size(3))
 }

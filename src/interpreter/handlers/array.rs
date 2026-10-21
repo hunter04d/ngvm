@@ -62,9 +62,7 @@ fn handle_s_arr_borrow(chunk: &Chunk, vm: &mut Vm, kind: RefKind) -> Result<usiz
         RefKind::Ref => arr_ref_checker.any_ref(),
         RefKind::Mut => arr_ref_checker.mut_ref(),
     }
-    .to()
-    .s_arr()
-    .and()
+    .to(|t| t.s_arr())
     .get();
     let index_type = index_meta.check("index").primitive().unsigned().get();
     let (ref_type, _) = combine_checks(arr_type, index_type).map_err(VmError::TypeError)?;

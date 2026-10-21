@@ -1,7 +1,9 @@
 use crate::types::checker::Taggable;
 use crate::types::{PointedType, RefType, SArrType, VmType};
 
-use super::{Checked, HasTypeCheckerCtx, Tag, TypeChecker, TypeCheckerCtx, TypeError};
+use super::{
+    Checked, HasTypeCheckerCtx, NestedChecker, Tag, TypeChecker, TypeCheckerCtx, TypeError,
+};
 
 pub struct RefTypeChecker<'a, C: HasTypeCheckerCtx> {
     pub(super) ref_type: Checked<&'a RefType>,
@@ -16,26 +18,37 @@ pub struct SArrTypeChecker<'a, C: HasTypeCheckerCtx> {
 }
 
 impl<'a, C: HasTypeCheckerCtx> RefTypeChecker<'a, C> {
-    pub fn to(self) -> TypeChecker<'a, Self> {
-        TypeChecker {
+    /// Runs `check` on the type the reference points to
+    pub fn to<N: NestedChecker<Self>>(
+        self,
+        check: impl FnOnce(TypeChecker<'a, Self>) -> N,
+    ) -> Self {
+        let pointed = TypeChecker {
             tag: self.tag.clone(),
             vm_type: self.ref_type.map(|r| &r.pointer),
             ctx: self,
-        }
+        };
+        check(pointed).into_parent()
+    }
+
+    /// Ends the check of this type, continuing with the check it is nested in
+    pub fn parent(self) -> C {
+        self.ctx
     }
 }
 
 impl<'a, C: HasTypeCheckerCtx> SArrTypeChecker<'a, C> {
-    pub fn of_type(self) -> TypeChecker<'a, Self> {
-        TypeChecker {
+    /// Runs `check` on the type of the array elements
+    pub fn of_type<N: NestedChecker<Self>>(
+        self,
+        check: impl FnOnce(TypeChecker<'a, Self>) -> N,
+    ) -> Self {
+        let element = TypeChecker {
             tag: self.tag.clone(),
             vm_type: self.arr_type.map(|r| &r.pointer),
             ctx: self,
-        }
-    }
-
-    pub fn and(self) -> C {
-        self.ctx
+        };
+        check(element).into_parent()
     }
 
     pub fn with_len(
@@ -51,6 +64,23 @@ impl<'a, C: HasTypeCheckerCtx> SArrTypeChecker<'a, C> {
             self.report(TypeError::Condition(vm_type.tag(self.tag.clone()), fmt))
         }
         self
+    }
+
+    /// Ends the check of this type, continuing with the check it is nested in
+    pub fn parent(self) -> C {
+        self.ctx
+    }
+}
+
+impl<C: HasTypeCheckerCtx> NestedChecker<C> for RefTypeChecker<'_, C> {
+    fn into_parent(self) -> C {
+        self.parent()
+    }
+}
+
+impl<C: HasTypeCheckerCtx> NestedChecker<C> for SArrTypeChecker<'_, C> {
+    fn into_parent(self) -> C {
+        self.parent()
     }
 }
 

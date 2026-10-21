@@ -2,7 +2,7 @@ use crate::code::refs::{ThreeStackRefs, TwoStackRefs};
 use crate::error::VmError;
 use crate::meta::StackMeta;
 use crate::stack::data::{FromSingle, IntoStackData, StackData};
-use crate::types::checker::{OperandTypesChecker, TypeCheckerCtx};
+use crate::types::checker::{ThreeOperandsChecker, TwoOperandsChecker, TypeCheckerCtx};
 use crate::vm::{Access, Vm};
 
 pub mod arith;
@@ -87,9 +87,9 @@ struct TwoStackMetadata<'a> {
     op: &'a StackMeta,
 }
 
-impl<'a> ThreeStackMetadata<'a> {
-    fn check<'c>(&'a self, ctx: &'c mut TypeCheckerCtx) -> OperandTypesChecker<'a, 'c, 3> {
-        OperandTypesChecker::three(
+impl ThreeStackMetadata<'_> {
+    fn check<'c>(&self, ctx: &'c mut TypeCheckerCtx) -> ThreeOperandsChecker<'c> {
+        ThreeOperandsChecker::new(
             &self.result.value_type,
             &self.op1.value_type,
             &self.op2.value_type,
@@ -98,9 +98,9 @@ impl<'a> ThreeStackMetadata<'a> {
     }
 }
 
-impl<'a> TwoStackMetadata<'a> {
-    fn check<'c>(&'a self, ctx: &'c mut TypeCheckerCtx) -> OperandTypesChecker<'a, 'c, 2> {
-        OperandTypesChecker::two(&self.result.value_type, &self.op.value_type, ctx)
+impl TwoStackMetadata<'_> {
+    fn check<'c>(&self, ctx: &'c mut TypeCheckerCtx) -> TwoOperandsChecker<'c> {
+        TwoOperandsChecker::new(&self.result.value_type, &self.op.value_type, ctx)
     }
 }
 
