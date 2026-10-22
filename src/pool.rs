@@ -12,6 +12,29 @@ pub enum Constant {
     // TODO
     /// Pointed type for things like Arr->i32, Ref->u64, etc.
     PointedType,
+    /// Function `name` of `module`, or of the current module if `module` is `None`
+    Fn {
+        module: Option<Box<str>>,
+        name: Box<str>,
+    },
+}
+
+impl Constant {
+    /// Function of the current module
+    pub fn function(name: &str) -> Self {
+        Constant::Fn {
+            module: None,
+            name: Box::from(name),
+        }
+    }
+
+    /// Function of another module
+    pub fn module_function(module: &str, name: &str) -> Self {
+        Constant::Fn {
+            module: Some(Box::from(module)),
+            name: Box::from(name),
+        }
+    }
 }
 
 macro_rules! impl_from {
@@ -67,6 +90,15 @@ impl ConstantPool {
     pub fn get_s_str(&self, index: PoolRef) -> Option<&str> {
         if let Some(Constant::String(s)) = self.get(index) {
             Some(s)
+        } else {
+            None
+        }
+    }
+
+    /// Module (`None` for the current one) and name of a function
+    pub fn get_fn(&self, index: PoolRef) -> Option<(Option<&str>, &str)> {
+        if let Some(Constant::Fn { module, name }) = self.get(index) {
+            Some((module.as_deref(), name))
         } else {
             None
         }

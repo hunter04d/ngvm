@@ -6,6 +6,7 @@ use std::str::from_utf8_unchecked;
 use crate::meta::StackMeta;
 use crate::stack::data::{FromSingle, IntoPrimitive, StackData};
 use crate::types::{PointedType, PrimitiveType, VmType};
+use crate::vm::refs::LocatedRef;
 
 /// Traces the stack value contained in a slice of stack data
 pub struct StackTracer<'a>(pub &'a [StackData], pub &'a StackMeta);
@@ -67,8 +68,9 @@ impl<'a> Debug for StackTracer<'a> {
                         }
                         PointedType::Ref(r) => {
                             // TODO: add cycle to the type of ref
-                            s.field("data", &usize::from_single(*data_0.unwrap()));
-                            s.field("location", &r.points_to);
+                            let located =
+                                LocatedRef::from_stack_data(stack).map_err(|_| fmt::Error)?;
+                            s.field("data", &located);
                             s.field("type", &format!("{}", r));
                         }
                         PointedType::Boxed(t) => {

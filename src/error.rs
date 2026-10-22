@@ -45,6 +45,18 @@ pub enum VmError {
     ScopeEndedDuringDeref,
     #[error("Attempt to deref @{} which points to a value holding references", (.0).0)]
     DerefOfBorrowingValue(StackRef),
+    #[error("Unknown function {name:?} in module {module:?}")]
+    UnknownFunction { module: String, name: String },
+    #[error("Function takes {expected} arguments, but the stack frame only has {got} values")]
+    NotEnoughArguments { expected: usize, got: usize },
+    #[error("Attempt to pass a value that is being dereferenced to a function")]
+    DerefPassedToCall,
+    #[error("Attempt to return outside of a function")]
+    RetOutsideFunction,
+    #[error("Function returns {expected} values, but {got} were returned")]
+    WrongReturnCount { expected: usize, got: usize },
+    #[error("Function ended without returning")]
+    MissingReturn,
 }
 
 #[derive(Debug)]

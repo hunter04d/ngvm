@@ -56,10 +56,10 @@ pub enum Opcode {
     JC = 47,
     StartScope = 48,
     EndScope = 49,
-    // TODO: call
-    /// Call <Module> <FnRef>
-    Call = 50, // Call <POOL REF>
-    Ret = 51, // Return <Value>
+    /// Call <FnRef>, the top values of the stack are the arguments
+    Call = 50,
+    /// Ret <Value>, returns a single value
+    Ret = 51,
     /// StartDeref <Ref>
     StartDeref = 52,
     /// EndDeref
@@ -68,6 +68,8 @@ pub enum Opcode {
     TakeRef = 54,
     /// TakeMut <Value>
     TakeMut = 55,
+    /// RetN <Count> <First>, returns the values from First to First + Count, Count is at least 1
+    RetN = 56,
 
     Mv = 60,
     Mp = 61,

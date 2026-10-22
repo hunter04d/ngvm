@@ -6,7 +6,7 @@ use ngvm::types::checker::{
     TypeError,
 };
 use ngvm::types::{
-    FloatType, IntegerOrBoolType, IntegerType, NumberType, PointedType, PrimitiveType, RefLocation,
+    FloatType, IntegerOrBoolType, IntegerType, NumberType, PointedType, PrimitiveType,
     SignedType, ThreePrimitiveTypes, TwoPrimitiveTypes, VmType,
 };
 
@@ -17,7 +17,7 @@ fn root_checker(t: &VmType) -> TypeChecker<'_, TypeCheckerCtx> {
 #[test]
 fn test_ref_to_array_of_primitive() {
     let arr = PointedType::s_arr(PrimitiveType::U64, 10);
-    let rf = PointedType::mut_reference(arr, RefLocation::Stack);
+    let rf = PointedType::mut_reference(arr);
     let t = VmType::from(rf);
     let ch = root_checker(&t);
     let res = ch
@@ -33,9 +33,9 @@ fn test_ref_to_array_of_primitive() {
 
 #[test]
 fn test_refs_deep() {
-    let rf1 = PointedType::ref_reference(PrimitiveType::U64, RefLocation::Stack);
-    let rf2 = PointedType::ref_reference(rf1, RefLocation::Stack);
-    let rf3 = PointedType::ref_reference(rf2, RefLocation::Stack);
+    let rf1 = PointedType::ref_reference(PrimitiveType::U64);
+    let rf2 = PointedType::ref_reference(rf1);
+    let rf3 = PointedType::ref_reference(rf2);
     let t = VmType::from(rf3);
     let ch = root_checker(&t);
     let res = ch
@@ -61,8 +61,8 @@ fn test_array_is_not_a_ref() {
 
 #[test]
 fn test_ref_to_ref_is_not_an_array() {
-    let inner = PointedType::ref_reference(PrimitiveType::U64, RefLocation::Stack);
-    let t = VmType::from(PointedType::ref_reference(inner, RefLocation::Stack));
+    let inner = PointedType::ref_reference(PrimitiveType::U64);
+    let t = VmType::from(PointedType::ref_reference(inner));
     let res = root_checker(&t).any_ref().to(|t| t.s_arr()).get();
     let errors = res.expect_err("a reference is not an array");
     assert!(matches!(errors[..], [TypeError::NotArray(_)]), "{errors:?}");
@@ -297,7 +297,7 @@ fn test_parent_continues_the_operand_check() {
 #[test]
 fn test_parent_continues_the_pointed_check() {
     let arr = PointedType::s_arr(PrimitiveType::U8, 4);
-    let t = VmType::from(PointedType::ref_reference(arr, RefLocation::Stack));
+    let t = VmType::from(PointedType::ref_reference(arr));
     let errors = root_checker(&t)
         .any_ref()
         .to(|t| {

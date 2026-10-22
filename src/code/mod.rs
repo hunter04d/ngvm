@@ -5,7 +5,7 @@ pub use chunk::Chunk;
 use refs::{PoolRef, Ref, StackRef, ThreeStackRefs, TwoStackRefs};
 
 use crate::decoder::{DecodedOpcode, HANDLERS as D_HANDLERS};
-use crate::error::VmContextError;
+use crate::error::{VmContextError, VmError};
 use crate::interpreter::HANDLERS as I_HANDLERS;
 use crate::model;
 use crate::model::ToBytesCtx;
@@ -55,29 +55,47 @@ pub struct DecodeResult {
 }
 
 impl Code {
+    /// Interprets this code as the top level code, along with the functions it calls
     pub fn interpret(&self, vm: &mut Vm) -> Result<(), VmContextError> {
-        let mut chunk = Chunk::from_code(self);
-        while vm.ip < chunk.bytes.len() {
-            let byte = chunk.read_byte(0).unwrap();
-            let op_fn = I_HANDLERS[byte as usize];
-            let consumed = op_fn(&chunk, vm);
-            match consumed {
-                Err(e) => {
-                    return Err(VmContextError {
-                        error: e,
-                        location: Some(chunk.offset),
-                        opcode: chunk.full_opcode(),
-                    });
+        loop {
+            // code of the current stack frame, it only changes on a call or a return
+            let function = vm.current_function().cloned();
+            let code = function.as_ref().map_or(self, |f| &f.bytecode);
+            let depth = vm.frames.len();
+            let mut chunk = Chunk::from_code(code);
+            chunk.set_offset(vm.ip);
+            while vm.frames.len() == depth {
+                if vm.ip >= chunk.bytes.len() {
+                    return if depth == 0 {
+                        Ok(())
+                    } else {
+                        Err(VmContextError {
+                            error: VmError::MissingReturn,
+                            location: Some(vm.ip),
+                            opcode: None,
+                        })
+                    };
                 }
-                Ok(count) => {
-                    // we consumed in a linear nature
-                    vm.ip += count;
-                    // NOTE: don't use advance, position might be different
-                    chunk.set_offset(vm.ip);
+                let byte = chunk.read_byte(0).unwrap();
+                let op_fn = I_HANDLERS[byte as usize];
+                let consumed = op_fn(&chunk, vm);
+                match consumed {
+                    Err(e) => {
+                        return Err(VmContextError {
+                            error: e,
+                            location: Some(chunk.offset),
+                            opcode: chunk.full_opcode(),
+                        });
+                    }
+                    Ok(count) => {
+                        // we consumed in a linear nature
+                        vm.ip += count;
+                        // NOTE: don't use advance, position might be different
+                        chunk.set_offset(vm.ip);
+                    }
                 }
             }
         }
-        Ok(())
     }
 
     pub fn decode(&self) -> DecodeResult {

@@ -102,6 +102,15 @@ pub enum Opcode {
         index: StackRef,
     },
     TraceStackValue(StackRef),
+    /// Call the function from the constant pool, the top values of the stack are the arguments
+    Call(PoolRef),
+    /// Return the value from the current function
+    Ret(StackRef),
+    /// Return `count` values starting at `first` from the current function, `count` is at least 1
+    RetN {
+        first: StackRef,
+        count: usize,
+    },
 }
 
 type OpcodeBytes = SmallVec<[u8; 32]>;
@@ -241,6 +250,9 @@ impl Opcode {
             SArrCreate0(len, r) => with_offset_and_ref(Nc::SArrCreate0, *len, r.0),
             SArrGet { arr_ref, index } => with_two_refs(Nc::SArrRef, arr_ref.0, index.0),
             SArrMut { arr_mut, index } => with_two_refs(Nc::SArrMut, arr_mut.0, index.0),
+            Call(f) => with_one_ref(Nc::Call, f.0),
+            Ret(v) => with_one_ref(Nc::Ret, v.0),
+            RetN { first, count } => with_offset_and_ref(Nc::RetN, *count, first.0),
         };
         Some(b)
     }
@@ -298,6 +310,9 @@ impl Opcode {
             TraceStackValue(_) => 1 + refs_size(1),
             SArrGet { .. } => 1 + refs_size(2),
             SArrMut { .. } => 1 + refs_size(2),
+            Call(_) => 1 + refs_size(1),
+            Ret(_) => 1 + refs_size(1),
+            RetN { .. } => 1 + refs_size(2),
         }
     }
 }

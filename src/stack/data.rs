@@ -1,8 +1,6 @@
 use std::convert::TryInto;
 use std::mem::size_of;
 
-use crate::vm::ValueLocation;
-
 /// Data type of the stack data
 pub(crate) type StackData = [u8; 8];
 
@@ -49,15 +47,6 @@ impl FromSingle<StackData> for char {
         const S: usize = size_of::<u32>();
         std::char::from_u32(u32::from_le_bytes(obj[..S].try_into().unwrap()))
             .expect("Invalid char {}")
-    }
-}
-
-impl FromPrimitive<ValueLocation> for StackData {
-    fn from_primitive(obj: ValueLocation) -> Self {
-        match obj {
-            ValueLocation::Stack(sr) => StackData::from_primitive(sr),
-            ValueLocation::Heap(hr) => StackData::from_primitive(hr as usize),
-        }
     }
 }
 

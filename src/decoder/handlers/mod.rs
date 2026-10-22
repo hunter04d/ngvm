@@ -1,5 +1,5 @@
 use crate::code::{Chunk, RefSource};
-use crate::code::refs::{CodeRef, PoolRef};
+use crate::code::refs::{CodeRef, PoolRef, StackRef};
 use crate::opcodes::Opcode;
 
 use super::DecodedOpcode;
@@ -152,6 +152,29 @@ pub(super) fn decode_start_scope(_: &Chunk) -> Option<DecodedOpcode> {
 
 pub(super) fn decode_end_scope(_: &Chunk) -> Option<DecodedOpcode> {
     Some(DecodedOpcode::zero(Opcode::EndScope))
+}
+
+pub(super) fn decode_call(chunk: &Chunk) -> Option<DecodedOpcode> {
+    let f = chunk.read_ref_pool(0)?;
+    Some(DecodedOpcode::one(Opcode::Call, DecoderRef::new(f, tags::FN)))
+}
+
+pub(super) fn decode_ret(chunk: &Chunk) -> Option<DecodedOpcode> {
+    let value = chunk.read_ref_stack(0)?;
+    Some(DecodedOpcode::one(
+        Opcode::Ret,
+        DecoderRef::new(value, tags::VALUE),
+    ))
+}
+
+pub(super) fn decode_ret_n(chunk: &Chunk) -> Option<DecodedOpcode> {
+    let count = chunk.read_offset()?;
+    let first = chunk.read_ref_with_offset(0)?;
+    let refs = DecoderRefs::Two(
+        DecoderRef::offset(count, tags::COUNT),
+        DecoderRef::new(StackRef(first), tags::VALUE),
+    );
+    Some(DecodedOpcode::new(Opcode::RetN, refs))
 }
 
 pub(super) fn decode_start_deref(chunk: &Chunk) -> Option<DecodedOpcode> {

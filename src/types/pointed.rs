@@ -1,8 +1,6 @@
 use std::fmt::{self, Display, Formatter};
 
-use crate::stack::data::{IntoPrimitive, StackData};
-use crate::vm::refs::LocatedRef;
-use crate::vm::ValueLocation;
+use num_derive::FromPrimitive;
 
 use super::VmType;
 
@@ -21,26 +19,25 @@ impl PointedType {
         })
     }
 
-    pub fn reference(pointer: impl Into<VmType>, kind: RefKind, location: RefLocation) -> Self {
+    pub fn reference(pointer: impl Into<VmType>, kind: RefKind) -> Self {
         PointedType::Ref(RefType {
             kind,
-            points_to: location,
             pointer: pointer.into(),
         })
     }
 
-    pub fn ref_reference(pointer: impl Into<VmType>, location: RefLocation) -> Self {
-        Self::reference(pointer, RefKind::Ref, location)
+    pub fn ref_reference(pointer: impl Into<VmType>) -> Self {
+        Self::reference(pointer, RefKind::Ref)
     }
 
-    pub fn mut_reference(pointer: impl Into<VmType>, location: RefLocation) -> Self {
-        Self::reference(pointer, RefKind::Mut, location)
+    pub fn mut_reference(pointer: impl Into<VmType>) -> Self {
+        Self::reference(pointer, RefKind::Mut)
     }
 
     pub fn size(&self) -> usize {
         match self {
             PointedType::SArr(SArrType { len, pointer }) => len * pointer.size(),
-            PointedType::Ref(_) => 1,
+            PointedType::Ref(_) => 2,
             PointedType::Boxed(_) => 1,
         }
     }
@@ -55,8 +52,12 @@ pub enum RefKind {
     Mut,
 }
 
+/// Where a reference points to
+///
+/// This is not a part of the reference type, but of the reference value: references of the same
+/// type can point to different locations. See [`RefData`](crate::vm::refs::RefData).
 #[repr(u8)]
-#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash, FromPrimitive)]
 pub enum RefLocation {
     Stack,
     Heap,
@@ -67,7 +68,6 @@ pub enum RefLocation {
 #[derive(Debug, PartialEq, Clone, Hash)]
 pub struct RefType {
     pub kind: RefKind,
-    pub points_to: RefLocation,
     pub pointer: VmType,
 }
 
@@ -78,16 +78,6 @@ pub struct SArrType {
 }
 
 impl RefType {
-    pub fn locate(&self, ref_value: &StackData) -> LocatedRef {
-        let index: usize = ref_value.into_primitive();
-        match self.points_to {
-            RefLocation::Stack => LocatedRef::Stack(index),
-            RefLocation::Heap => unimplemented!(),
-            RefLocation::TransientOnStack => LocatedRef::Transient(ValueLocation::Stack(index)),
-            RefLocation::TransientOnHeap => unreachable!(),
-        }
-    }
-
     pub fn is_copy(&self) -> bool {
         match self.kind {
             RefKind::Mut => false,

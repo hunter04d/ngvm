@@ -1,20 +1,21 @@
 use std::collections::HashMap;
 use std::ops::Range;
+use std::rc::Rc;
 
 use lock::ValueLock;
 pub use refs::code::VmRefSource;
 use refs::LocatedRef;
 use smallvec::SmallVec;
 
-use crate::{ConstantPool, Module};
-use crate::code::refs::StackRef;
+use crate::{ConstantPool, Function, Module};
+use crate::code::refs::{PoolRef, StackRef};
 use crate::error::VmError;
 use crate::meta::{StackMeta, TransientMeta, VmMetaView};
 use crate::stack::data::IntoStackData;
 use crate::stack::data::StackData;
 use crate::stack::get_stack_range;
-use crate::types::{PointedType, PrimitiveType, RefKind, RefLocation, RefType, VmType};
-use crate::types::checker::Taggable;
+use crate::types::{PointedType, PrimitiveType, RefKind, RefType, VmType};
+use crate::types::checker::{Taggable, TypeError};
 use crate::vm::lock::DerefLock;
 
 pub mod lock;
@@ -33,6 +34,10 @@ mod tests;
 /// Every live reference holds one borrow (see [`ValueLock`]) on the value it points to and
 /// releases it when it stops existing (popped or overwritten), unless it was moved out.
 /// A reference may only be stored above the value it points to, so it can never outlive it.
+///
+/// A function call moves its arguments into a new stack frame, which only the callee can access.
+/// Returning pops the whole frame and moves the returned value onto the caller's stack,
+/// so a reference into the frame cannot be returned.
 pub struct Vm {
     /// vm stack values
     pub(crate) stack: Vec<StackData>,
@@ -57,6 +62,9 @@ pub struct Vm {
     pub(crate) modules: HashMap<String, Module>,
 
     pub(crate) current_module: String,
+
+    /// Active function calls, the last one is executing
+    pub(crate) frames: Vec<CallFrame>,
 }
 
 pub type Result<T> = std::result::Result<T, VmError>;
@@ -104,7 +112,13 @@ impl Vm {
             last_stack_frame: 0,
             modules: map,
             current_module: "".into(),
+            frames: Vec::new(),
         }
+    }
+
+    pub fn add_module(&mut self, name: impl Into<String>, m: Module) -> &mut Self {
+        self.modules.insert(name.into(), m);
+        self
     }
 
     pub fn default_growing_stack() -> Self {
@@ -214,7 +228,7 @@ impl Vm {
 
     /// Borrows the stack value at `index` and pushes a reference of `kind` to it
     pub(crate) fn push_stack_ref(&mut self, index: StackRef, kind: RefKind) -> Result<()> {
-        let target = self.absolute_index(index);
+        let data = LocatedRef::Stack(self.absolute_index(index)).to_stack_data();
         let meta = self.stack_metadata_mut(index)?;
         if meta.was_moved {
             return Err(VmError::UseOfMovedValue(index));
@@ -222,10 +236,10 @@ impl Vm {
         meta.lock
             .add_lock(kind)
             .map_err(|e| VmError::LockError(e, ValueLocation::Stack(index.0)))?;
-        let ref_type = PointedType::reference(meta.value_type.clone(), kind, RefLocation::Stack);
+        let ref_type = PointedType::reference(meta.value_type.clone(), kind);
         let ref_meta = self.new_stack_meta_of_type(ref_type.into());
         self.stack_metadata.push(ref_meta);
-        self.stack.push(target.into_stack_data());
+        self.stack.extend(data);
         Ok(())
     }
 
@@ -239,6 +253,7 @@ impl Vm {
         kind: RefKind,
     ) -> Result<()> {
         let parent = self.absolute_index(arr_ref);
+        let data = LocatedRef::Transient(location).to_stack_data();
         // check both locks before changing either of them
         let mut element_lock = self
             .transient_refs
@@ -263,13 +278,12 @@ impl Vm {
 
         let ref_type = RefType {
             kind,
-            points_to: RefLocation::TransientOnStack,
             pointer: element_type,
         };
         let mut meta = self.new_stack_meta_of_type(ref_type.into());
         meta.borrowed_through = Some(parent);
         self.stack_metadata.push(meta);
-        self.stack.push(location.into_stack_data());
+        self.stack.extend(data);
         Ok(())
     }
 
@@ -287,7 +301,7 @@ impl Vm {
             Some(PointedType::SArr(_)) | None => return Ok(()),
         };
         let kind = r.kind;
-        let located = r.locate(self.stack.get(meta.index.0).ok_or(VmError::BadVmState)?);
+        let located = self.located(meta)?;
         let parent = meta.borrowed_through;
         match located {
             LocatedRef::Stack(target) => self
@@ -329,7 +343,7 @@ impl Vm {
         if r.kind != RefKind::Ref {
             return Err(VmError::BadVmState);
         }
-        let located = r.locate(self.stack.get(meta.index.0).ok_or(VmError::BadVmState)?);
+        let located = self.located(meta)?;
         let parent = meta.borrowed_through;
         match located {
             LocatedRef::Stack(target) => self
@@ -353,6 +367,15 @@ impl Vm {
         }
     }
 
+    /// What the reference with the metadata `meta` points to
+    fn located(&self, meta: &StackMeta) -> Result<LocatedRef> {
+        let data = self
+            .stack
+            .get(get_stack_range(meta.index.0, meta))
+            .ok_or(VmError::BadVmState)?;
+        LocatedRef::from_stack_data(data)
+    }
+
     /// Absolute index of the value that must outlive the value at absolute `index`
     ///
     /// For a reference it is the value it points to, or the array reference an element was
@@ -363,7 +386,7 @@ impl Vm {
             return Ok(meta.borrowed_through);
         }
         match meta.value_type.ref_type() {
-            Some(r) => match r.locate(self.stack.get(meta.index.0).ok_or(VmError::BadVmState)?) {
+            Some(_) => match self.located(meta)? {
                 LocatedRef::Stack(target) => Ok(Some(target)),
                 LocatedRef::Transient(_) => Err(VmError::BadVmState),
             },
@@ -458,7 +481,9 @@ impl Vm {
     }
 
     pub(crate) fn pop_scope(&mut self) -> Result<()> {
-        if self.cycle == 1 {
+        // a function cannot end the scopes of its caller
+        let first_cycle = self.frames.last().map_or(1, |f| f.caller_cycle + 1);
+        if self.cycle <= first_cycle {
             Err(VmError::BadVmState)
         } else {
             self.cycle -= 1;
@@ -492,8 +517,10 @@ impl Vm {
     /// Type and stack data range of the value that the reference at absolute `index` points to
     fn pointee(&self, index: usize) -> Result<(VmType, Range<usize>)> {
         let meta = self.absolute_metadata(index)?;
-        let r = meta.value_type.ref_type().ok_or(VmError::BadVmState)?;
-        match r.locate(self.stack.get(meta.index.0).ok_or(VmError::BadVmState)?) {
+        if meta.value_type.ref_type().is_none() {
+            return Err(VmError::BadVmState);
+        }
+        match self.located(meta)? {
             LocatedRef::Stack(target) => {
                 let target = self.absolute_metadata(target)?;
                 let range = get_stack_range(target.index.0, target);
@@ -553,6 +580,14 @@ impl Vm {
     }
 
     pub(crate) fn pop_deref(&mut self) -> Result<()> {
+        // a function cannot end the derefs of its caller
+        if !self
+            .derefs
+            .last()
+            .is_some_and(|d| d.deref >= self.last_stack_frame)
+        {
+            return Err(VmError::BadVmState);
+        }
         let d = self.derefs.pop().ok_or(VmError::BadVmState)?;
         let rf_meta = self.absolute_metadata(d.rf)?;
         let kind = rf_meta.value_type.ref_type().ok_or(VmError::BadVmState)?.kind;
@@ -575,11 +610,153 @@ impl Vm {
             .map_err(|_| VmError::BadVmState)
     }
 
+    /// Calls the function `f` refers to, with the top values of the stack as its arguments
+    ///
+    /// The arguments become the first values of the function's stack frame, created in a new
+    /// scope so that the function can borrow them. Execution continues at the start of the
+    /// function, [`ret`](Self::ret) continues at `return_ip`.
+    pub(crate) fn call(&mut self, f: PoolRef, return_ip: usize) -> Result<()> {
+        let (module, name) = self
+            .current_const_pool()
+            .get_fn(f)
+            .ok_or(VmError::ConstantPoolError)?;
+        let module = module.filter(|&m| m != self.current_module).map(str::to_owned);
+        let module_name = module.as_deref().unwrap_or(&self.current_module);
+        let function = self
+            .modules
+            .get(module_name)
+            .and_then(|m| m.function(name))
+            .ok_or_else(|| VmError::UnknownFunction {
+                module: module_name.to_owned(),
+                name: name.to_owned(),
+            })?;
+        let function = Rc::clone(function);
+
+        let params = function.signature.params();
+        let in_frame = self.stack_metadata.len() - self.last_stack_frame;
+        if in_frame < params.len() {
+            return Err(VmError::NotEnoughArguments {
+                expected: params.len(),
+                got: in_frame,
+            });
+        }
+        let base = self.stack_metadata.len() - params.len();
+        if self.derefs.iter().any(|d| d.deref >= base) {
+            return Err(VmError::DerefPassedToCall);
+        }
+        let mut errors = Vec::new();
+        for (i, param) in params.iter().enumerate() {
+            let meta = self.absolute_metadata(base + i)?;
+            if meta.was_moved {
+                return Err(VmError::UseOfMovedValue(StackRef(base + i - self.last_stack_frame)));
+            }
+            if meta.value_type != *param {
+                let arg = meta.value_type.tag(format!("arg{i}"));
+                errors.push(TypeError::NotEquals(arg, param.clone()));
+            }
+        }
+        if !errors.is_empty() {
+            return Err(VmError::TypeError(errors));
+        }
+
+        let cycle = self.cycle.checked_add(1).ok_or(VmError::BadVmState)?;
+        let caller_module = module.map(|m| std::mem::replace(&mut self.current_module, m));
+        self.frames.push(CallFrame {
+            function,
+            return_ip,
+            caller_frame: self.last_stack_frame,
+            caller_cycle: self.cycle,
+            caller_module,
+        });
+        self.last_stack_frame = base;
+        self.cycle = cycle;
+        self.ip = 0;
+        Ok(())
+    }
+
+    /// Returns `value` from the current function to its caller
+    pub(crate) fn ret(&mut self, value: StackRef) -> Result<()> {
+        self.ret_values(value, 1)
+    }
+
+    /// Returns the `count` values starting at `first` from the current function to its caller
+    ///
+    /// Pops the function's stack frame, then pushes the values onto the caller's stack in order.
+    pub(crate) fn ret_values(&mut self, first: StackRef, count: usize) -> Result<()> {
+        let frame = self.frames.last().ok_or(VmError::RetOutsideFunction)?;
+        let returns = frame.function.signature.returns();
+        if count != returns.len() {
+            return Err(VmError::WrongReturnCount {
+                expected: returns.len(),
+                got: count,
+            });
+        }
+        let base = self.last_stack_frame;
+        if self.derefs.iter().any(|d| d.deref >= base) {
+            return Err(VmError::ScopeEndedDuringDeref);
+        }
+
+        // a single value is kept inline
+        let mut values: SmallVec<[(VmType, Option<usize>); 1]> = SmallVec::new();
+        let mut data: SmallVec<[StackData; 2]> = SmallVec::new();
+        let mut errors = Vec::new();
+        for (i, return_type) in returns.iter().enumerate() {
+            let value = StackRef(first.0.checked_add(i).ok_or(VmError::BadVmState)?);
+            let meta = self.checked_stack_metadata(value, Access::Move)?;
+            if meta.value_type != *return_type {
+                let tag = if count == 1 { "ret".to_owned() } else { format!("ret{i}") };
+                errors.push(TypeError::NotEquals(meta.value_type.tag(tag), return_type.clone()));
+                continue;
+            }
+            if let Some(anchor) = self.borrow_anchor(self.absolute_index(value))?
+                && anchor >= base
+            {
+                return Err(VmError::ReferenceEscapesScope(value));
+            }
+            values.push((meta.value_type.clone(), meta.borrowed_through));
+            data.extend_from_slice(self.stack_data(value)?);
+        }
+        if !errors.is_empty() {
+            return Err(VmError::TypeError(errors));
+        }
+
+        // the slots are popped below, so even `Copy` values are moved out along with their borrows
+        for i in 0..count {
+            self.stack_metadata_mut(StackRef(first.0 + i))?.was_moved = true;
+        }
+        while self.stack_metadata.len() > base {
+            self.pop_stack()?;
+        }
+
+        let frame = self.frames.pop().ok_or(VmError::BadVmState)?;
+        self.last_stack_frame = frame.caller_frame;
+        self.cycle = frame.caller_cycle;
+        if let Some(m) = frame.caller_module {
+            self.current_module = m;
+        }
+        self.ip = frame.return_ip;
+
+        let mut data = data.into_iter();
+        for (t, borrowed_through) in values {
+            let size = t.size();
+            let mut meta = self.new_stack_meta_of_type(t);
+            meta.borrowed_through = borrowed_through;
+            self.stack_metadata.push(meta);
+            self.stack.extend(data.by_ref().take(size));
+        }
+        Ok(())
+    }
+
+    /// The function being executed, `None` for the top level code
+    pub fn current_function(&self) -> Option<&Rc<Function>> {
+        self.frames.last().map(|f| &f.function)
+    }
+
     pub fn locate_ref(&self, index: StackRef) -> Result<(LocatedRef, &RefType)> {
         let meta = self.stack_metadata(index)?;
         if let Some(PointedType::Ref(r)) = meta.value_type.pointed() {
-            let data = self.single_stack_data(index)?;
-            Ok((r.locate(data), r))
+            let data = self.stack_data(index)?;
+            Ok((LocatedRef::from_stack_data(data)?, r))
         } else {
             Err(VmError::BadVmState)
         }
@@ -622,6 +799,7 @@ impl Default for Vm {
             current_module: "".to_string(),
             transient_refs: HashMap::new(),
             derefs: Vec::new(),
+            frames: Vec::new(),
         }
     }
 }
@@ -645,4 +823,19 @@ pub struct VmDeref {
     pub rf: usize,
     /// The copy of the pointed-to value
     pub deref: usize,
+}
+
+/// An active function call
+#[derive(Debug)]
+pub struct CallFrame {
+    /// The called function
+    pub function: Rc<Function>,
+    /// Instruction of the caller to continue at after the return
+    pub return_ip: usize,
+    /// Stack frame of the caller
+    pub caller_frame: usize,
+    /// Cycle of the caller
+    pub caller_cycle: usize,
+    /// Module of the caller, if the called function is in another module
+    pub caller_module: Option<String>,
 }

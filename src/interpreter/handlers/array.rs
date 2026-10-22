@@ -65,9 +65,9 @@ fn handle_s_arr_borrow(chunk: &Chunk, vm: &mut Vm, kind: RefKind) -> Result<usiz
     .to(|t| t.s_arr())
     .get();
     let index_type = index_meta.check("index").primitive().unsigned().get();
-    let (ref_type, _) = combine_checks(arr_type, index_type).map_err(VmError::TypeError)?;
+    combine_checks(arr_type, index_type).map_err(VmError::TypeError)?;
 
-    let arr_loc_ref = ref_type.locate(vm.single_stack_data(arr_ref)?);
+    let arr_loc_ref = LocatedRef::from_stack_data(vm.stack_data(arr_ref)?)?;
     let (arr_location, element_type, len) = get_arr_data(vm, arr_loc_ref)?;
     let index: usize = vm.single_stack_data(index_ref)?.into_primitive();
     if index >= len {

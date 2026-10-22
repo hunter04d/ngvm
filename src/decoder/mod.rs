@@ -59,13 +59,13 @@ pub(crate) static HANDLERS: [fn(&Chunk) -> Option<DecodedOpcode>; 256] = [
     decode_jc,                // 47
     decode_start_scope,       // 48
     decode_end_scope,         // 49
-    noop,                     // 50
-    noop,                     // 51
+    decode_call,              // 50
+    decode_ret,               // 51
     decode_start_deref,       // 52
     decode_end_deref,         // 53
     decode_take_ref,          // 54
     decode_take_mut,          // 55
-    noop,                     // 56
+    decode_ret_n,             // 56
     noop,                     // 57
     noop,                     // 58
     noop,                     // 59

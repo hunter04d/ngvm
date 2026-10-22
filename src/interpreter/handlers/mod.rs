@@ -7,6 +7,7 @@ use super::stack_tracer::StackTracer;
 
 pub(in crate::interpreter) mod alu;
 pub(in crate::interpreter) mod array;
+pub(in crate::interpreter) mod call;
 pub(in crate::interpreter) mod jumps;
 pub(in crate::interpreter) mod load;
 pub(in crate::interpreter) mod memory;
