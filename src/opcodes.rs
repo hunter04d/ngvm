@@ -107,7 +107,7 @@ impl Opcode {
         }
     }
 
-    pub fn bytes(self) -> ArrayVec<[u8; 2]> {
+    pub fn bytes(self) -> ArrayVec<u8, 2> {
         let mut vec = ArrayVec::new();
         // SAFETY: safe as size of vec cannot exceed 2
         unsafe {

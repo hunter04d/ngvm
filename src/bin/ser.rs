@@ -43,10 +43,11 @@ fn fibonacci() -> Vec<model::Opcode> {
 fn main() -> io::Result<()> {
     let m = fibonacci();
     let m = m.as_slice();
+
     let file = File::create("data/fib.yaml")?;
-    serde_yaml::to_writer(file, m).unwrap();
-    let file = File::create("data/fib.bincode")?;
-    bincode::serialize_into(file, m).unwrap();
+    serde_yaml_ng::to_writer(file, m).unwrap();
+    let file = File::create("data/fib.postcard")?;
+    postcard::to_io(m, file).unwrap();
     let file = File::create("data/fib.json")?;
     serde_json::to_writer(file, m).unwrap();
     Ok(())
