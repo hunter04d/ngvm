@@ -57,6 +57,12 @@ pub enum VmError {
     WrongReturnCount { expected: usize, got: usize },
     #[error("Function ended without returning")]
     MissingReturn,
+    #[error("Function has {count} arguments, there is no argument {index}")]
+    NoSuchArgument { index: usize, count: usize },
+    #[error("Module {0:?} is already loaded")]
+    ModuleAlreadyLoaded(String),
+    #[error("Native function failed: {0}")]
+    Native(Box<dyn std::error::Error + Send + Sync>),
 }
 
 #[derive(Debug)]

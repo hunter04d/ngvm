@@ -1,3 +1,4 @@
+use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::ops::Range;
 use std::rc::Rc;
@@ -7,18 +8,18 @@ pub use refs::code::VmRefSource;
 use refs::LocatedRef;
 use smallvec::SmallVec;
 
-use crate::{ConstantPool, Function, Module};
+use crate::{ConstantPool, Function, FunctionBody, Module};
 use crate::code::refs::{PoolRef, StackRef};
 use crate::error::VmError;
 use crate::meta::{StackMeta, TransientMeta, VmMetaView};
-use crate::stack::data::IntoStackData;
-use crate::stack::data::StackData;
+use crate::stack::data::{FromSingle, IntoStackData, StackData};
 use crate::stack::get_stack_range;
 use crate::types::{PointedType, PrimitiveType, RefKind, RefType, VmType};
 use crate::types::checker::{Taggable, TypeError};
 use crate::vm::lock::DerefLock;
 
 pub mod lock;
+pub mod native;
 pub mod refs;
 #[cfg(test)]
 mod tests;
@@ -26,7 +27,8 @@ mod tests;
 /// # Memory model
 ///
 /// Only bytecode can change the state of the vm, the methods that do are crate private
-/// so that the checks below cannot be bypassed.
+/// so that the checks below cannot be bypassed. Native functions can only access their own
+/// stack frame through [`NativeCall`](native::NativeCall), which uses the same methods.
 ///
 /// Values live on the stack and are only ever removed from its top, so a value at a lower
 /// index always outlives a value at a higher one.
@@ -38,6 +40,9 @@ mod tests;
 /// A function call moves its arguments into a new stack frame, which only the callee can access.
 /// Returning pops the whole frame and moves the returned value onto the caller's stack,
 /// so a reference into the frame cannot be returned.
+///
+/// A static string value points to a string of a constant pool (see [`static_str`]).
+/// Modules are never removed or replaced, so the string lives as long as the vm.
 pub struct Vm {
     /// vm stack values
     pub(crate) stack: Vec<StackData>,
@@ -58,7 +63,7 @@ pub struct Vm {
     /// Index from which all indexing is happening
     pub(crate) last_stack_frame: usize,
 
-    /// Loaded modules
+    /// Loaded modules, they are never removed or replaced
     pub(crate) modules: HashMap<String, Module>,
 
     pub(crate) current_module: String,
@@ -116,9 +121,15 @@ impl Vm {
         }
     }
 
-    pub fn add_module(&mut self, name: impl Into<String>, m: Module) -> &mut Self {
-        self.modules.insert(name.into(), m);
-        self
+    /// Loads the module `m` as `name`, fails if a module with that name is already loaded
+    pub fn add_module(&mut self, name: impl Into<String>, m: Module) -> Result<&mut Self> {
+        match self.modules.entry(name.into()) {
+            Entry::Occupied(e) => Err(VmError::ModuleAlreadyLoaded(e.key().clone())),
+            Entry::Vacant(e) => {
+                e.insert(m);
+                Ok(self)
+            }
+        }
     }
 
     pub fn default_growing_stack() -> Self {
@@ -615,6 +626,8 @@ impl Vm {
     /// The arguments become the first values of the function's stack frame, created in a new
     /// scope so that the function can borrow them. Execution continues at the start of the
     /// function, [`ret`](Self::ret) continues at `return_ip`.
+    ///
+    /// A native function is run to completion, the call returns with execution at `return_ip`.
     pub(crate) fn call(&mut self, f: PoolRef, return_ip: usize) -> Result<()> {
         let (module, name) = self
             .current_const_pool()
@@ -662,7 +675,7 @@ impl Vm {
         let cycle = self.cycle.checked_add(1).ok_or(VmError::BadVmState)?;
         let caller_module = module.map(|m| std::mem::replace(&mut self.current_module, m));
         self.frames.push(CallFrame {
-            function,
+            function: Rc::clone(&function),
             return_ip,
             caller_frame: self.last_stack_frame,
             caller_cycle: self.cycle,
@@ -671,7 +684,18 @@ impl Vm {
         self.last_stack_frame = base;
         self.cycle = cycle;
         self.ip = 0;
-        Ok(())
+        match &function.body {
+            FunctionBody::Bytecode(_) => Ok(()),
+            FunctionBody::Native(f) => self.run_native(f, params.len()),
+        }
+    }
+
+    /// Runs the native function `f` in the current stack frame and returns the values it pushed
+    fn run_native(&mut self, f: &native::NativeFn, params: usize) -> Result<()> {
+        f.call(&mut native::NativeCall::new(self, params))?;
+        // the native function can only push values, they all follow the arguments
+        let count = self.stack_metadata.len() - self.last_stack_frame - params;
+        self.ret_values(StackRef(params), count)
     }
 
     /// Returns `value` from the current function to its caller
@@ -802,6 +826,20 @@ impl Default for Vm {
             frames: Vec::new(),
         }
     }
+}
+
+/// The string the stack data of a [`SStr`](PrimitiveType::SStr) value points to
+pub(crate) fn static_str(data: &[StackData]) -> Result<&str> {
+    let &[ptr, len] = data else {
+        return Err(VmError::BadVmState);
+    };
+    let ptr = usize::from_single(ptr) as *const u8;
+    let len = usize::from_single(len);
+    // SAFETY: a `SStr` value is only created by `LdSS` from a string of a constant pool
+    // (or by a native function from a `&'static str`) and copied as a whole, it is never zeroed.
+    // The pools of the loaded modules are never changed, and the modules are never removed
+    // or replaced, so the string outlives the vm and with it the borrow of `data`.
+    unsafe { Ok(std::str::from_utf8_unchecked(std::slice::from_raw_parts(ptr, len))) }
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]

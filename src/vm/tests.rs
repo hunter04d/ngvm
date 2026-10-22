@@ -9,7 +9,7 @@ use crate::types::checker::TypeError;
 use crate::types::{PointedType, RefKind, VmType};
 use crate::vm::lock::{LockError, ValueLock};
 use crate::vm::refs::LocatedRef;
-use crate::{Code, Constant, ConstantPool, Function, Module, Signature, Vm};
+use crate::{Code, Constant, ConstantPool, Function, Module, NativeCall, Signature, Vm};
 
 const STR: &str = "str";
 
@@ -964,7 +964,7 @@ fn test_call_into_another_module() {
             Constant::module_function("missing", "add_ten"),
         ];
         let mut vm = Vm::with_module(module(vec![], fns));
-        vm.add_module("math", math);
+        vm.add_module("math", math).unwrap();
         vm
     };
     // the pool of the caller is used again after the return
@@ -1168,3 +1168,500 @@ fn test_return_checks_all_values() {
     assert!(matches!(e, VmError::BadVmState), "{e:?}");
 }
 
+
+/// Module with the native functions `natives` followed by the bytecode functions `fns`,
+/// the function at index `i` is called with `Call(p(FNS + i))`
+fn native_module(natives: Vec<(&'static str, Function)>, fns: Vec<TestFn>) -> Module {
+    let mut constants = constants();
+    constants.extend(natives.iter().map(|(name, _)| Constant::function(name)));
+    constants.extend(fns.iter().map(|f| Constant::function(f.name)));
+    let mut module = Module::new(ConstantPool::new(constants));
+    for (name, f) in natives {
+        module.add_fn(name.into(), f);
+    }
+    for f in fns {
+        let code = Code::from_model(&f.code).expect("valid model");
+        module.add_fn(f.name.into(), Function::new(f.signature, code));
+    }
+    module
+}
+
+fn run_natives(
+    natives: Vec<(&'static str, Function)>,
+    code: Vec<Opcode>,
+) -> (Vm, Result<(), VmContextError>) {
+    run_in(Vm::with_module(native_module(natives, vec![])), code)
+}
+
+/// `add(a: u64, b: u64) -> u64`
+fn native_add() -> (&'static str, Function) {
+    let f = Function::native(Signature::new(vec![u64_t(), u64_t()], U64), |call| {
+        let sum = call.arg::<u64>(0)? + call.arg::<u64>(1)?;
+        call.ret(sum);
+        Ok(())
+    });
+    ("add", f)
+}
+
+#[test]
+fn test_native_call_returns_value() {
+    let vm = ok(run_natives(
+        vec![native_add()],
+        vec![ld_u64(1), ld_u64(3), Call(p(FNS)), ld_u64(1)],
+    ));
+    // the arguments are gone, the result took their place and execution continued
+    assert_eq!(vm.stack_metadata.len(), 2);
+    assert_eq!(u64_at(&vm, 0), 4);
+    assert_eq!(u64_at(&vm, 1), 1);
+    assert_eq!(vm.current_cycle(), 1);
+}
+
+#[test]
+fn test_native_called_from_bytecode_function() {
+    // add_three(x: u64) -> u64 { add(add(x, 1), 1) + 1 }
+    let add_three = test_fn(
+        "add_three",
+        vec![u64_t()],
+        U64,
+        vec![
+            ld_u64(1),
+            Call(p(FNS)),
+            ld_u64(1),
+            Call(p(FNS)),
+            ld_u64(1),
+            Add(three(0, 0, 1)),
+            Ret(s(0)),
+        ],
+    );
+    let vm = Vm::with_module(native_module(vec![native_add()], vec![add_three]));
+    let vm = ok(run_in(vm, vec![ld_u64(3), Call(p(FNS + 1))]));
+    assert_eq!(vm.stack_metadata.len(), 1);
+    assert_eq!(u64_at(&vm, 0), 6);
+}
+
+#[test]
+fn test_native_keeps_state() {
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    let log = Rc::new(RefCell::new(Vec::new()));
+    let sink = Rc::clone(&log);
+    let print = Function::native(Signature::new(vec![u64_t()], Unit), move |call| {
+        sink.borrow_mut().push(call.arg::<u64>(0)?);
+        call.ret(());
+        Ok(())
+    });
+    ok(run_natives(
+        vec![("print", print)],
+        vec![ld_u64(1), Call(p(FNS)), ld_u64(3), Call(p(FNS))],
+    ));
+    assert_eq!(*log.borrow(), vec![1, 3]);
+}
+
+#[test]
+fn test_native_returns_multiple_values() {
+    let div_rem = Function::native(
+        Signature::with_returns(vec![u64_t(), u64_t()], vec![u64_t(), u64_t()]).unwrap(),
+        |call| {
+            let (a, b) = (call.arg::<u64>(0)?, call.arg::<u64>(1)?);
+            if b == 0 {
+                return Err(VmError::Native("division by zero".into()));
+            }
+            call.ret(a / b);
+            call.ret(a % b);
+            Ok(())
+        },
+    );
+    let vm = Vm::with_module(native_module(vec![("div_rem", div_rem)], vec![]));
+    let vm = ok(run_in(vm, vec![ld_u64(3), ld_u64(3), Call(p(FNS))]));
+    assert_eq!(vm.stack_metadata.len(), 2);
+    assert_eq!(u64_at(&vm, 0), 1);
+    assert_eq!(u64_at(&vm, 1), 0);
+}
+
+#[test]
+fn test_native_error_ends_execution() {
+    let fail = Function::native(Signature::new(vec![], U64), |_| {
+        Err(VmError::Native("failed".into()))
+    });
+    let e = err(run_natives(vec![("fail", fail)], vec![Call(p(FNS))]));
+    assert!(matches!(e, VmError::Native(ref e) if e.to_string() == "failed"), "{e:?}");
+}
+
+#[test]
+fn test_native_return_is_checked() {
+    let call = |returns: Vec<VmType>, f: fn(&mut NativeCall<'_>) -> crate::vm::Result<()>| {
+        let native = Function::native(Signature::with_returns(vec![], returns).unwrap(), f);
+        err(run_natives(vec![("native", native)], vec![Call(p(FNS))]))
+    };
+
+    let e = call(vec![u64_t()], |_| Ok(()));
+    assert!(
+        matches!(e, VmError::WrongReturnCount { expected: 1, got: 0 }),
+        "{e:?}"
+    );
+    let e = call(vec![u64_t()], |call| {
+        call.ret(1u64);
+        call.ret(2u64);
+        Ok(())
+    });
+    assert!(
+        matches!(e, VmError::WrongReturnCount { expected: 1, got: 2 }),
+        "{e:?}"
+    );
+    let e = call(vec![u64_t(), u64_t()], |call| {
+        call.ret(1u64);
+        call.ret(true);
+        Ok(())
+    });
+    match e {
+        VmError::TypeError(errors) => match errors.as_slice() {
+            [TypeError::NotEquals(t, _)] => assert_eq!(t.tag.to_string(), "ret1"),
+            errors => panic!("{errors:?}"),
+        },
+        e => panic!("{e:?}"),
+    }
+}
+
+#[test]
+fn test_native_arguments_are_checked() {
+    use std::cell::Cell;
+    use std::rc::Rc;
+
+    // the arguments are checked against the signature before the function runs
+    let called = Rc::new(Cell::new(false));
+    let flag = Rc::clone(&called);
+    let native = Function::native(Signature::new(vec![u64_t()], U64), move |call| {
+        flag.set(true);
+        call.ret_arg(0)
+    });
+    let e = err(run_natives(vec![("native", native)], vec![LdTrue, Call(p(FNS))]));
+    assert!(matches!(e, VmError::TypeError(_)), "{e:?}");
+    assert!(!called.get());
+
+    // the arguments are read with their own type
+    let native = Function::native(Signature::new(vec![u64_t()], U64), |call| {
+        let v: i64 = call.arg(0)?;
+        call.ret(v as u64);
+        Ok(())
+    });
+    let e = err(run_natives(vec![("native", native)], vec![Ld0U64, Call(p(FNS))]));
+    match e {
+        VmError::TypeError(errors) => match errors.as_slice() {
+            [TypeError::NotEquals(t, _)] => assert_eq!(t.tag.to_string(), "arg0"),
+            errors => panic!("{errors:?}"),
+        },
+        e => panic!("{e:?}"),
+    }
+
+    // only the arguments can be read, not the values of the caller or the returned ones
+    let native = Function::native(Signature::new(vec![u64_t()], U64), |call| {
+        call.ret(0u64);
+        let v: u64 = call.arg(1)?;
+        call.ret(v);
+        Ok(())
+    });
+    let e = err(run_natives(vec![("native", native)], vec![Ld0U64, Ld0U64, Call(p(FNS))]));
+    assert!(
+        matches!(e, VmError::NoSuchArgument { index: 1, count: 1 }),
+        "{e:?}"
+    );
+}
+
+/// `set(x: &mut u64, v: u64) -> ()`
+fn native_set() -> (&'static str, Function) {
+    let params = vec![ref_t(RefKind::Mut, U64), u64_t()];
+    let f = Function::native(Signature::new(params, Unit), |call| {
+        let v = call.arg::<u64>(1)?;
+        call.write(0, v)?;
+        call.ret(());
+        Ok(())
+    });
+    ("set", f)
+}
+
+/// `get(x: &u64) -> u64`
+fn native_get() -> (&'static str, Function) {
+    let f = Function::native(Signature::new(vec![ref_t(RefKind::Ref, U64)], U64), |call| {
+        let v = call.read::<u64>(0)?;
+        call.ret(v);
+        Ok(())
+    });
+    ("get", f)
+}
+
+#[test]
+fn test_native_reads_and_writes_through_refs() {
+    let vm = ok(run_natives(
+        vec![native_set(), native_get()],
+        vec![
+            Ld0U64,
+            Scope(vec![TakeMut(s(0)), ld_u64(3), Call(p(FNS))]),
+            Scope(vec![TakeRef(s(0)), Call(p(FNS + 1))]),
+        ],
+    ));
+    assert_eq!(vm.stack_metadata.len(), 1);
+    assert_eq!(u64_at(&vm, 0), 3);
+
+    // through array element references
+    let vm = ok(run_natives(
+        vec![native_set(), native_get()],
+        vec![
+            SArrCreate0(3, p(0)),
+            ld_u64(1),
+            Scope(vec![
+                TakeMut(s(0)),
+                Scope(vec![
+                    SArrMut {
+                        arr_mut: s(2),
+                        index: s(1),
+                    },
+                    ld_u64(3),
+                    Call(p(FNS)),
+                ]),
+            ]),
+            Scope(vec![
+                TakeRef(s(0)),
+                Scope(vec![
+                    SArrGet {
+                        arr_ref: s(2),
+                        index: s(1),
+                    },
+                    Call(p(FNS + 1)),
+                    // 3: the read element
+                    Mv(s(1), s(3)),
+                ]),
+            ]),
+        ],
+    ));
+    assert_eq!(data_at(&vm, 0), vec![0, 3, 0]);
+    assert_eq!(u64_at(&vm, 1), 3);
+}
+
+#[test]
+fn test_native_cannot_write_through_shared_ref() {
+    let write = Function::native(Signature::new(vec![ref_t(RefKind::Ref, U64)], Unit), |call| {
+        call.write(0, 1u64)?;
+        call.ret(());
+        Ok(())
+    });
+    let e = err(run_natives(
+        vec![("write", write)],
+        vec![Ld0U64, Scope(vec![TakeRef(s(0)), Call(p(FNS))])],
+    ));
+    assert!(matches!(e, VmError::TypeError(_)), "{e:?}");
+
+    // nor through a reference of another type
+    let write = Function::native(Signature::new(vec![ref_t(RefKind::Mut, U64)], Unit), |call| {
+        call.write(0, 1i64)?;
+        call.ret(());
+        Ok(())
+    });
+    let e = err(run_natives(
+        vec![("write", write)],
+        vec![Ld0U64, Scope(vec![TakeMut(s(0)), Call(p(FNS))])],
+    ));
+    assert!(matches!(e, VmError::TypeError(_)), "{e:?}");
+}
+
+#[test]
+fn test_native_returns_ref_argument() {
+    // id(x: &mut u64) -> &mut u64
+    let id = || {
+        let t = ref_t(RefKind::Mut, U64);
+        let f = Function::native(Signature::new(vec![t.clone()], t), |call| call.ret_arg(0));
+        ("id", f)
+    };
+    let vm = ok(run_natives(
+        vec![id(), native_set()],
+        vec![
+            Ld0U64,
+            Scope(vec![
+                TakeMut(s(0)),
+                Call(p(FNS)),
+                ld_u64(3),
+                Call(p(FNS + 1)),
+            ]),
+        ],
+    ));
+    assert_eq!(u64_at(&vm, 0), 3);
+
+    // the returned reference keeps the borrow
+    let e = err(run_natives(
+        vec![id()],
+        vec![
+            Ld0U64,
+            ld_u64(1),
+            Scope(vec![TakeMut(s(0)), Call(p(FNS)), Add(three(0, 0, 1))]),
+        ],
+    ));
+    assert_lock_error(e, LockError::WriteButLocked);
+
+    // a mutable reference is moved out of the argument
+    let twice = Function::native(
+        Signature::with_returns(
+            vec![ref_t(RefKind::Mut, U64)],
+            vec![ref_t(RefKind::Mut, U64), ref_t(RefKind::Mut, U64)],
+        )
+        .unwrap(),
+        |call| {
+            call.ret_arg(0)?;
+            call.ret_arg(0)
+        },
+    );
+    let e = err(run_natives(
+        vec![("twice", twice)],
+        vec![Ld0U64, Scope(vec![TakeMut(s(0)), Call(p(FNS))])],
+    ));
+    assert!(matches!(e, VmError::UseOfMovedValue(StackRef(0))), "{e:?}");
+
+    let write_moved = Function::native(
+        Signature::new(vec![ref_t(RefKind::Mut, U64)], ref_t(RefKind::Mut, U64)),
+        |call| {
+            call.ret_arg(0)?;
+            call.write(0, 1u64)
+        },
+    );
+    let e = err(run_natives(
+        vec![("write_moved", write_moved)],
+        vec![Ld0U64, Scope(vec![TakeMut(s(0)), Call(p(FNS))])],
+    ));
+    assert!(matches!(e, VmError::UseOfMovedValue(StackRef(0))), "{e:?}");
+}
+
+#[test]
+fn test_native_in_another_module() {
+    let mut math = Module::new(ConstantPool::new(vec![]));
+    let (name, add) = native_add();
+    math.add_fn(name.into(), add);
+    let mut vm = Vm::with_module(module(vec![], vec![Constant::module_function("math", "add")]));
+    vm.add_module("math", math).unwrap();
+    // the pool of the caller is used again after the return
+    let vm = ok(run_in(vm, vec![ld_u64(1), ld_u64(3), Call(p(FNS)), ld_u64(1)]));
+    assert_eq!(u64_at(&vm, 0), 4);
+    assert_eq!(u64_at(&vm, 1), 1);
+}
+
+#[test]
+fn test_module_cannot_be_replaced() {
+    let math = || {
+        let mut math = Module::new(ConstantPool::new(vec![]));
+        let (name, add) = native_add();
+        math.add_fn(name.into(), add);
+        math
+    };
+    let mut vm = Vm::with_module(module(vec![], vec![Constant::module_function("math", "add")]));
+    vm.add_module("math", math()).unwrap();
+    let e = vm.add_module("math", math()).map(|_| ()).unwrap_err();
+    assert!(matches!(e, VmError::ModuleAlreadyLoaded(ref m) if m == "math"), "{e:?}");
+    let e = vm.add_module("", math()).map(|_| ()).unwrap_err();
+    assert!(matches!(e, VmError::ModuleAlreadyLoaded(ref m) if m.is_empty()), "{e:?}");
+
+    // the loaded modules are still there
+    let vm = ok(run_in(vm, vec![ld_u64(1), ld_u64(3), Call(p(FNS)), LdSS(p(5))]));
+    assert_eq!(u64_at(&vm, 0), 4);
+    assert_eq!(super::static_str(vm.stack_data(StackRef(1)).unwrap()).unwrap(), STR);
+}
+
+/// `len(s: SStr) -> u64`
+fn native_len() -> (&'static str, Function) {
+    let f = Function::native(Signature::new(vec![SStr.into()], U64), |call| {
+        let len = call.arg_str(0)?.len();
+        call.ret(len as u64);
+        Ok(())
+    });
+    ("len", f)
+}
+
+#[test]
+fn test_static_string_outlives_its_module_code() {
+    // the string is loaded from the pool of another module and returned from there
+    let mut strings = Module::new(ConstantPool::new(vec!["hello, world".into()]));
+    let greet = Code::from_model(&[LdSS(p(0)), Ret(s(0))]).unwrap();
+    strings.add_fn(
+        "greet".into(),
+        Function::new(Signature::new(vec![], SStr), greet),
+    );
+    let fns = vec![
+        Constant::function("len"),
+        Constant::module_function("strings", "greet"),
+    ];
+    let mut main = module(vec![], fns);
+    let (name, len) = native_len();
+    main.add_fn(name.into(), len);
+    let mut vm = Vm::with_module(main);
+    vm.add_module("strings", strings).unwrap();
+
+    let vm = ok(run_in(
+        vm,
+        vec![Call(p(FNS + 1)), Mp(s(0)), Call(p(FNS)), Ld0U64, Mv(s(2), s(1))],
+    ));
+    assert_eq!(
+        super::static_str(vm.stack_data(StackRef(0)).unwrap()).unwrap(),
+        "hello, world"
+    );
+    assert_eq!(u64_at(&vm, 2), "hello, world".len() as u64);
+}
+
+#[test]
+fn test_native_static_strings() {
+    let sstr = || VmType::from(SStr);
+    // concat_check(s: SStr, r: &SStr) -> (SStr, SStr, bool): returns s, a new string
+    // and whether both strings are equal
+    let native = Function::native(
+        Signature::with_returns(
+            vec![sstr(), ref_t(RefKind::Ref, SStr)],
+            vec![sstr(), sstr(), Bool.into()],
+        )
+        .unwrap(),
+        |call| {
+            let equal = call.arg_str(0)? == call.read_str(1)?;
+            call.ret_arg(0)?;
+            call.ret_str("native");
+            call.ret(equal);
+            Ok(())
+        },
+    );
+    let vm = ok(run_natives(
+        vec![("native", native), native_len()],
+        vec![
+            LdSS(p(5)), // 0
+            LdFalse,    // 1
+            Ld0U64,     // 2
+            Scope(vec![
+                Mp(s(0)),      // 3
+                TakeRef(s(0)), // 4
+                Call(p(FNS)),
+                // 3: s, 4: "native", 5: equal
+                Mv(s(1), s(5)),
+                Mv(s(0), s(4)),
+                Mp(s(0)),
+                Call(p(FNS + 1)),
+                // 6: len("native")
+                Mv(s(2), s(6)),
+            ]),
+        ],
+    ));
+    assert_eq!(vm.stack_metadata.len(), 3);
+    assert_eq!(super::static_str(vm.stack_data(StackRef(0)).unwrap()).unwrap(), "native");
+    let equal: bool = vm.single_stack_data(StackRef(1)).unwrap().into_primitive();
+    assert!(equal);
+    assert_eq!(u64_at(&vm, 2), "native".len() as u64);
+
+    // a string is read with its own type
+    let e = err(run_natives(vec![native_len()], vec![Ld0U64, Call(p(FNS))]));
+    assert!(matches!(e, VmError::TypeError(_)), "{e:?}");
+    let not_str = Function::native(Signature::new(vec![u64_t()], U64), |call| {
+        let len = call.arg_str(0)?.len();
+        call.ret(len as u64);
+        Ok(())
+    });
+    let e = err(run_natives(vec![("not_str", not_str)], vec![Ld0U64, Call(p(FNS))]));
+    match e {
+        VmError::TypeError(errors) => match errors.as_slice() {
+            [TypeError::NotEquals(t, _)] => assert_eq!(t.tag.to_string(), "arg0"),
+            errors => panic!("{errors:?}"),
+        },
+        e => panic!("{e:?}"),
+    }
+}

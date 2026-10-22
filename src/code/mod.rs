@@ -9,7 +9,7 @@ use crate::error::{VmContextError, VmError};
 use crate::interpreter::HANDLERS as I_HANDLERS;
 use crate::model;
 use crate::model::ToBytesCtx;
-use crate::Vm;
+use crate::{FunctionBody, Vm};
 
 mod chunk;
 pub mod refs;
@@ -60,7 +60,12 @@ impl Code {
         loop {
             // code of the current stack frame, it only changes on a call or a return
             let function = vm.current_function().cloned();
-            let code = function.as_ref().map_or(self, |f| &f.bytecode);
+            let code = match function.as_deref().map(|f| &f.body) {
+                None => self,
+                Some(FunctionBody::Bytecode(code)) => code,
+                // a native function returns within its call
+                Some(FunctionBody::Native(_)) => return Err(VmError::BadVmState.into()),
+            };
             let depth = vm.frames.len();
             let mut chunk = Chunk::from_code(code);
             chunk.set_offset(vm.ip);

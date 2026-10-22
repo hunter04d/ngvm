@@ -6,6 +6,8 @@ use smallvec::SmallVec;
 pub use code::Code;
 pub use pool::{Constant, ConstantPool};
 pub use vm::Vm;
+pub use vm::native::{NativeCall, NativeFn, NativeValue};
+use crate::error::VmError;
 use crate::types::VmType;
 
 pub mod code;
@@ -46,17 +48,41 @@ impl Module {
 ///
 /// The arguments are the top values of the caller's stack, they are moved into the function's
 /// stack frame, so the function sees them as its first stack values.
-/// The function must end with [`Ret`](opcodes::Opcode::Ret), or [`RetN`](opcodes::Opcode::RetN)
-/// if it returns more than one value.
 #[derive(Debug)]
 pub struct Function {
     pub signature: Signature,
-    pub bytecode: Code,
+    pub body: FunctionBody,
+}
+
+#[derive(Debug)]
+pub enum FunctionBody {
+    /// The function must end with [`Ret`](opcodes::Opcode::Ret), or
+    /// [`RetN`](opcodes::Opcode::RetN) if it returns more than one value
+    Bytecode(Code),
+    /// Implemented in Rust, see [`NativeCall`]
+    Native(NativeFn),
 }
 
 impl Function {
     pub fn new(signature: Signature, bytecode: Code) -> Self {
-        Self { signature, bytecode }
+        Self {
+            signature,
+            body: FunctionBody::Bytecode(bytecode),
+        }
+    }
+
+    /// Function implemented by `f`
+    ///
+    /// `f` reads the arguments and returns the values through the [`NativeCall`] it is given,
+    /// the vm checks them against `signature` just like for a bytecode function.
+    pub fn native(
+        signature: Signature,
+        f: impl Fn(&mut NativeCall<'_>) -> Result<(), VmError> + 'static,
+    ) -> Self {
+        Self {
+            signature,
+            body: FunctionBody::Native(NativeFn::new(f)),
+        }
     }
 }
 

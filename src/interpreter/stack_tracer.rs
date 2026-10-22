@@ -1,12 +1,11 @@
 use std::fmt::{self, Debug, Formatter};
 use std::ops::Deref;
-use std::slice::from_raw_parts;
-use std::str::from_utf8_unchecked;
 
 use crate::meta::StackMeta;
-use crate::stack::data::{FromSingle, IntoPrimitive, StackData};
+use crate::stack::data::{FromSingle, StackData};
 use crate::types::{PointedType, PrimitiveType, VmType};
 use crate::vm::refs::LocatedRef;
+use crate::vm::static_str;
 
 /// Traces the stack value contained in a slice of stack data
 pub struct StackTracer<'a>(pub &'a [StackData], pub &'a StackMeta);
@@ -42,10 +41,7 @@ impl<'a> Debug for StackTracer<'a> {
                         PrimitiveType::Bool => s.field("data", &bool::from_single(data_0)),
                         PrimitiveType::Char => s.field("data", &char::from_single(data_0)),
                         PrimitiveType::SStr => {
-                            let ptr = usize::from_single(data_0) as *const u8;
-                            let len: usize = self.0.get(1).ok_or(fmt::Error)?.into_primitive();
-                            let str = unsafe { from_utf8_unchecked(from_raw_parts(ptr, len)) };
-                            s.field("data", &str)
+                            s.field("data", &static_str(stack).map_err(|_| fmt::Error)?)
                         }
                     };
                 }
